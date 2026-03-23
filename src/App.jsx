@@ -240,18 +240,37 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
   const [showImage, setShowImage] = useState(!!image);
   const [showTable, setShowTable] = useState(!!table);
   const [urlInput, setUrlInput] = useState("");
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
 
-  const handleFile = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageData = (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = (ev) => { onImageChange(ev.target.result); };
     reader.readAsDataURL(file);
   };
 
+  const handleFile = (e) => handleImageData(e.target.files?.[0]);
+
   const handleUrlAdd = () => {
     if (urlInput.trim()) { onImageChange(urlInput.trim()); setUrlInput(""); }
+  };
+
+  const handlePaste = (e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const imgItem = items.find(item => item.type.startsWith("image/"));
+    if (imgItem) {
+      e.preventDefault();
+      setShowImage(true);
+      handleImageData(imgItem.getAsFile());
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleImageData(file);
   };
 
   const toggleImage = () => {
@@ -274,7 +293,8 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     <div style={{ flex: 1, minWidth: 200 }}>
       <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>{label}</label>
       <textarea style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "vertical", minHeight: 60 }}
-        value={textValue} onChange={e => onTextChange(e.target.value)} placeholder={`Enter ${label.toLowerCase()}`} rows={2} />
+        value={textValue} onChange={e => onTextChange(e.target.value)} onPaste={handlePaste}
+        placeholder={`Enter ${label.toLowerCase()} — or paste an image with Ctrl+V`} rows={2} />
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
         <button style={toolbarBtn(showImage)} onClick={toggleImage} type="button"><Icons.Image /> Image</button>
         <button style={toolbarBtn(showTable)} onClick={toggleTable} type="button"><Icons.Table /> Table</button>
@@ -288,12 +308,22 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
                 style={{ position: "absolute", top: -6, right: -6, background: "#EF4444", border: "none", borderRadius: "50%", width: 20, height: 20, color: "#fff", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>
           ) : (
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <button type="button" style={toolbarBtn(false)} onClick={() => fileRef.current?.click()}>Upload file</button>
-              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
-              <input style={{ flex: 1, minWidth: 100, background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 6, padding: "5px 10px", color: t.text, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}
-                placeholder="or paste image URL" value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === "Enter" && handleUrlAdd()} />
-              <button type="button" style={toolbarBtn(false)} onClick={handleUrlAdd}>Add</button>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              style={{ border: `2px dashed ${dragOver ? "#6366F1" : t.border}`, borderRadius: 8, padding: "12px 10px", background: dragOver ? "rgba(99,102,241,0.08)" : "transparent", transition: "all 0.15s" }}
+            >
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+                <button type="button" style={toolbarBtn(false)} onClick={() => fileRef.current?.click()}>Upload file</button>
+                <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+                <input style={{ flex: 1, minWidth: 100, background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 6, padding: "5px 10px", color: t.text, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}
+                  placeholder="or paste image URL" value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === "Enter" && handleUrlAdd()} />
+                <button type="button" style={toolbarBtn(false)} onClick={handleUrlAdd}>Add</button>
+              </div>
+              <p style={{ color: t.text4, fontSize: 11, textAlign: "center", fontFamily: "'DM Sans', sans-serif" }}>
+                drag & drop an image here · or paste with Ctrl+V in the text field above
+              </p>
             </div>
           )}
         </div>
