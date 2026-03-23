@@ -15,6 +15,7 @@ const THEMES = {
     navBg: "rgba(11,17,32,0.9)",
     inputBg: "#111827", inputBg2: "#0B1120",
     scrollbar: "#1E293B",
+    selectBg: "#111827",
   },
   light: {
     appBg: "linear-gradient(170deg, #F8FAFC 0%, #EFF6FF 40%, #F8FAFC 100%)",
@@ -27,6 +28,7 @@ const THEMES = {
     navBg: "rgba(248,250,252,0.9)",
     inputBg: "#FFFFFF", inputBg2: "#F8FAFC",
     scrollbar: "#E2E8F0",
+    selectBg: "#FFFFFF",
   },
 };
 
@@ -39,7 +41,7 @@ const mkCard = (id, term, definition) => ({
 
 const SAMPLE_SETS = [
   {
-    id: "demo-1", title: "Spanish Basics",
+    id: "demo-1", title: "Spanish Basics", folderId: null,
     description: "Common Spanish vocabulary for beginners",
     createdAt: Date.now(),
     cards: [
@@ -54,7 +56,7 @@ const SAMPLE_SETS = [
     ],
   },
   {
-    id: "demo-2", title: "Biology: Cell Structure",
+    id: "demo-2", title: "Biology: Cell Structure", folderId: null,
     description: "Key organelles and their functions",
     createdAt: Date.now() - 86400000,
     cards: [
@@ -87,10 +89,14 @@ const Icons = {
   Moon: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>,
   Image: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>,
   Table: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>,
+  Folder: () => <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>,
+  FolderPlus: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><path d="M12 11v6M9 14h6"/></svg>,
 };
 
 // ─── Storage ───
 const STORAGE_KEY = "flashforge-sets";
+const FOLDERS_KEY = "flashforge-folders";
+
 const storage = {
   load() {
     try { const d = localStorage.getItem(STORAGE_KEY); return d ? JSON.parse(d) : null; }
@@ -99,6 +105,17 @@ const storage = {
   save(sets) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sets)); }
     catch (e) { console.error("Save failed:", e); }
+  },
+};
+
+const foldersStorage = {
+  load() {
+    try { const d = localStorage.getItem(FOLDERS_KEY); return d ? JSON.parse(d) : []; }
+    catch { return []; }
+  },
+  save(folders) {
+    try { localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders)); }
+    catch (e) { console.error("Folders save failed:", e); }
   },
 };
 
@@ -111,16 +128,20 @@ const newCard = () => ({
   termImage: null, defImage: null, termTable: null, defTable: null,
 });
 
-// ─── SM-2 spaced repetition ───
+// ─── SM-2 spaced repetition (fixed: Easy gets bonus interval on first reviews) ───
 function computeSM2(card, rating) {
   let { interval = 0, easeFactor = 2.5, repetitions = 0 } = card;
   if (rating < 2) {
     repetitions = 0;
     interval = 1;
   } else {
-    if (repetitions === 0) interval = 1;
-    else if (repetitions === 1) interval = 6;
-    else interval = Math.round(interval * easeFactor);
+    if (repetitions === 0) {
+      interval = rating === 3 ? 4 : 1;    // Easy: 4d bonus on first review
+    } else if (repetitions === 1) {
+      interval = rating === 3 ? 10 : 6;   // Easy: 10d bonus on second review
+    } else {
+      interval = Math.round(interval * easeFactor);
+    }
     easeFactor = Math.max(1.3, easeFactor + 0.1 - (3 - rating) * (0.08 + (3 - rating) * 0.02));
     repetitions++;
   }
@@ -173,11 +194,7 @@ function TableEditor({ rows, onChange }) {
   const addCol = () => onChange(rows.map(row => [...row, ""]));
   const removeCol = () => (rows[0]?.length || 0) > 1 && onChange(rows.map(row => row.slice(0, -1)));
 
-  const tinyBtn = {
-    padding: "3px 8px", fontSize: 11, borderRadius: 6,
-    background: t.bg3, border: `1px solid ${t.border}`,
-    color: t.text2, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-  };
+  const tinyBtn = { padding: "3px 8px", fontSize: 11, borderRadius: 6, background: t.bg3, border: `1px solid ${t.border}`, color: t.text2, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" };
 
   return (
     <div style={{ marginTop: 8 }}>
@@ -188,16 +205,9 @@ function TableEditor({ rows, onChange }) {
               <tr key={r}>
                 {row.map((cell, c) => (
                   <td key={c} style={{ border: `1px solid ${t.border2}`, padding: 2 }}>
-                    <input
-                      value={cell}
-                      onChange={e => updateCell(r, c, e.target.value)}
+                    <input value={cell} onChange={e => updateCell(r, c, e.target.value)}
                       placeholder={r === 0 ? `Header ${c + 1}` : "Cell"}
-                      style={{
-                        background: r === 0 ? t.bg3 : t.inputBg, border: "none",
-                        color: t.text, padding: "4px 8px", fontSize: 12,
-                        fontFamily: "'DM Sans', sans-serif", width: 90, outline: "none",
-                      }}
-                    />
+                      style={{ background: r === 0 ? t.bg3 : t.inputBg, border: "none", color: t.text, padding: "4px 8px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: 90, outline: "none" }} />
                   </td>
                 ))}
               </tr>
@@ -245,19 +255,16 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
   };
 
   const toggleImage = () => {
-    if (showImage) { onImageChange(null); setShowImage(false); }
-    else setShowImage(true);
+    if (showImage) { onImageChange(null); setShowImage(false); } else setShowImage(true);
   };
-
   const toggleTable = () => {
     if (showTable) { onTableChange(null); setShowTable(false); }
     else { onTableChange([["Header 1", "Header 2"], ["", ""]]); setShowTable(true); }
   };
 
   const toolbarBtn = (active) => ({
-    display: "flex", alignItems: "center", gap: 4,
-    padding: "4px 10px", borderRadius: 6, fontSize: 12, cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif",
+    display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6,
+    fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
     background: active ? "rgba(99,102,241,0.15)" : t.bg3,
     border: `1px solid ${active ? "#6366F1" : t.border}`,
     color: active ? "#818CF8" : t.text3,
@@ -265,57 +272,33 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
 
   return (
     <div style={{ flex: 1, minWidth: 200 }}>
-      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>
-        {label}
-      </label>
-      <textarea
-        style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "vertical", minHeight: 60 }}
-        value={textValue}
-        onChange={e => onTextChange(e.target.value)}
-        placeholder={`Enter ${label.toLowerCase()}`}
-        rows={2}
-      />
+      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>{label}</label>
+      <textarea style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "vertical", minHeight: 60 }}
+        value={textValue} onChange={e => onTextChange(e.target.value)} placeholder={`Enter ${label.toLowerCase()}`} rows={2} />
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-        <button style={toolbarBtn(showImage)} onClick={toggleImage} type="button">
-          <Icons.Image /> Image
-        </button>
-        <button style={toolbarBtn(showTable)} onClick={toggleTable} type="button">
-          <Icons.Table /> Table
-        </button>
+        <button style={toolbarBtn(showImage)} onClick={toggleImage} type="button"><Icons.Image /> Image</button>
+        <button style={toolbarBtn(showTable)} onClick={toggleTable} type="button"><Icons.Table /> Table</button>
       </div>
-
       {showImage && (
         <div style={{ marginTop: 8, padding: 10, background: t.bg3, borderRadius: 8, border: `1px solid ${t.border}` }}>
           {image ? (
             <div style={{ position: "relative", display: "inline-block" }}>
               <img src={image} alt="" style={{ maxHeight: 100, maxWidth: "100%", borderRadius: 6, objectFit: "contain" }} />
               <button type="button" onClick={() => onImageChange(null)}
-                style={{ position: "absolute", top: -6, right: -6, background: "#EF4444", border: "none", borderRadius: "50%", width: 20, height: 20, color: "#fff", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                ✕
-              </button>
+                style={{ position: "absolute", top: -6, right: -6, background: "#EF4444", border: "none", borderRadius: "50%", width: 20, height: 20, color: "#fff", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>
           ) : (
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <button type="button" style={toolbarBtn(false)} onClick={() => fileRef.current?.click()}>Upload file</button>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
-              <input
-                style={{ flex: 1, minWidth: 100, background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 6, padding: "5px 10px", color: t.text, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}
-                placeholder="or paste image URL"
-                value={urlInput}
-                onChange={e => setUrlInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleUrlAdd()}
-              />
+              <input style={{ flex: 1, minWidth: 100, background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 6, padding: "5px 10px", color: t.text, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}
+                placeholder="or paste image URL" value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === "Enter" && handleUrlAdd()} />
               <button type="button" style={toolbarBtn(false)} onClick={handleUrlAdd}>Add</button>
             </div>
           )}
         </div>
       )}
-
-      {showTable && table && (
-        <div style={{ marginTop: 8 }}>
-          <TableEditor rows={table} onChange={onTableChange} />
-        </div>
-      )}
+      {showTable && table && <div style={{ marginTop: 8 }}><TableEditor rows={table} onChange={onTableChange} /></div>}
     </div>
   );
 }
@@ -332,15 +315,20 @@ function makeStyles(t) {
     headerInner: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
     logo: { fontSize: 26, fontWeight: 700, fontFamily: "'Space Mono', monospace", background: "linear-gradient(135deg, #818CF8, #6366F1, #A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", marginBottom: 4 },
     subtitle: { color: t.text3, fontSize: 14 },
-    actionBar: { display: "flex", gap: 10, padding: "16px 24px", maxWidth: 1200, margin: "0 auto" },
+    actionBar: { display: "flex", gap: 10, padding: "16px 24px", maxWidth: 1200, margin: "0 auto", flexWrap: "wrap" },
 
     primaryBtn: { display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg, #6366F1, #4F46E5)", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", justifyContent: "center" },
     secondaryBtn: { display: "flex", alignItems: "center", gap: 8, background: t.bg2, color: t.text2, border: `1px solid ${t.border2}`, borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
     dangerBtn: { display: "flex", alignItems: "center", gap: 8, background: "transparent", color: "#EF4444", border: "1px solid #7F1D1D", borderRadius: 10, padding: "10px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", width: "100%", justifyContent: "center" },
     iconBtn: { background: "none", border: "none", color: t.text3, cursor: "pointer", padding: 6, borderRadius: 6, display: "flex" },
     themeBtn: { background: "none", border: `1px solid ${t.border}`, color: t.text2, cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", alignItems: "center" },
+    studyAllBtn: { display: "flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg, #6366F1, #4F46E5)", color: "#fff", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
 
+    // Grids
     setGrid: { display: "grid", gap: 14, padding: "8px 24px 32px", maxWidth: 1200, margin: "0 auto", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" },
+    sectionLabel: { color: t.text3, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Space Mono', monospace", padding: "8px 24px 4px", maxWidth: 1200, margin: "0 auto" },
+
+    // Set cards
     setCard: { background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 14, padding: 16, textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", minHeight: 130, width: "100%", fontFamily: "'DM Sans', sans-serif" },
     setCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 6 },
     cardCount: { fontSize: 11, fontWeight: 600, color: "#818CF8", background: "rgba(99,102,241,0.12)", padding: "2px 8px", borderRadius: 6, fontFamily: "'Space Mono', monospace" },
@@ -350,10 +338,18 @@ function makeStyles(t) {
     dateLabel: { color: t.text4, fontSize: 11, fontFamily: "'Space Mono', monospace" },
     emptyState: { textAlign: "center", padding: "60px 20px" },
 
+    // Folder cards
+    folderCard: { background: `linear-gradient(145deg, ${t.bg2}, ${t.bg3})`, border: `1px solid ${t.border}`, borderRadius: 14, padding: 16, textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", minHeight: 110, width: "100%", fontFamily: "'DM Sans', sans-serif" },
+    folderIconWrap: { color: "#FBBF24", marginBottom: 10, display: "flex" },
+    folderName: { color: t.text, fontSize: 15, fontWeight: 600, marginBottom: 4, lineHeight: 1.3 },
+    folderMeta: { color: t.text3, fontSize: 12, marginTop: "auto", paddingTop: 8, display: "flex", alignItems: "center", gap: 8 },
+
+    // NavBar
     navBar: { display: "flex", alignItems: "center", padding: "16px 12px", gap: 8, borderBottom: `1px solid ${t.border}`, background: t.navBg, backdropFilter: "blur(8px)", position: "sticky", top: 0, zIndex: 10 },
     backBtn: { background: "none", border: "none", color: t.text2, cursor: "pointer", padding: 8, borderRadius: 8, display: "flex" },
     navTitle: { flex: 1, textAlign: "center", fontSize: 15, fontWeight: 600, color: t.text, fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
 
+    // Forms
     formSection: { padding: "20px 24px 0", maxWidth: 900, margin: "0 auto" },
     input: { width: "100%", background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 10, padding: "12px 14px", color: t.text, fontSize: 14, marginBottom: 12, fontFamily: "'DM Sans', sans-serif" },
     textarea: { width: "100%", background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 10, padding: "12px 14px", color: t.text, fontSize: 14, fontFamily: "'Space Mono', monospace", resize: "vertical", lineHeight: 1.6 },
@@ -363,19 +359,24 @@ function makeStyles(t) {
     cardNum: { fontSize: 12, fontWeight: 700, color: "#6366F1", fontFamily: "'Space Mono', monospace" },
     cardEditorFields: { display: "flex", gap: 10, flexWrap: "wrap" },
     addCardBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "calc(100% - 48px)", margin: "0 24px", maxWidth: "calc(900px - 48px)", padding: "12px", background: "transparent", border: `2px dashed ${t.border}`, borderRadius: 12, color: t.text3, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+    folderBreadcrumb: { display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, marginBottom: 12, color: "#818CF8", fontSize: 13, fontFamily: "'DM Sans', sans-serif" },
 
+    // Import
     chipBtn: { padding: "6px 14px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.bg2, color: t.text2, fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
     chipActive: { background: "#6366F1", borderColor: "#6366F1", color: "#fff" },
     previewBox: { background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: 14, marginTop: 12 },
     previewRow: { display: "flex", gap: 8, alignItems: "center", fontSize: 13, padding: "4px 0" },
 
+    // Detail
     detailHeader: { padding: "16px 24px", maxWidth: 900, margin: "0 auto" },
     modeGrid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 },
     modeBtn: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "18px 12px", background: "linear-gradient(135deg, #312E81, #4338CA)", border: "none", borderRadius: 12, color: "#E2E8F0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", position: "relative" },
     dueBadge: { position: "absolute", top: -6, right: -6, background: "#EF4444", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "2px 6px", fontFamily: "'Space Mono', monospace" },
     cardListPreview: { padding: "0 24px 20px", maxWidth: 900, margin: "0 auto" },
     cardPreviewRow: { display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, marginBottom: 6 },
+    folderSelect: { background: t.selectBg, border: `1px solid ${t.border}`, borderRadius: 8, padding: "8px 12px", color: t.text, fontSize: 13, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", flex: 1 },
 
+    // Study
     studyContainer: { padding: "16px 24px", maxWidth: 800, margin: "0 auto" },
     progressWrap: { height: 4, background: t.bg3, borderRadius: 2, overflow: "hidden", marginBottom: 12 },
     progressBar: { height: "100%", background: "linear-gradient(90deg, #6366F1, #818CF8)", borderRadius: 2, transition: "width 0.4s ease" },
@@ -394,8 +395,8 @@ function makeStyles(t) {
     goodBtn: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "8px 14px", background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, color: "#34D399", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
     easyBtn: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "8px 14px", background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 10, color: "#818CF8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
     ratingHint: { fontSize: 10, opacity: 0.7, fontFamily: "'Space Mono', monospace" },
-    doneScreen: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 20px" },
 
+    // Test
     testContainer: { padding: "20px 24px 32px", maxWidth: 900, margin: "0 auto" },
     questionBlock: { background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, marginBottom: 14 },
     questionLabel: { fontSize: 11, fontWeight: 700, color: "#6366F1", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6, fontFamily: "'Space Mono', monospace" },
@@ -421,6 +422,7 @@ const globalCSS = (t) => `
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   input::placeholder, textarea::placeholder { color: ${t.text4}; }
   input:focus, textarea:focus { outline: none; border-color: #6366F1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+  select:focus { outline: none; border-color: #6366F1 !important; }
   button:disabled { opacity: 0.4; cursor: not-allowed; }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -428,14 +430,13 @@ const globalCSS = (t) => `
   body { transition: background-color 0.25s; }
   .face-text { font-size: 22px; }
   @media (min-width: 768px) { .face-text { font-size: 26px; } }
-  @media (max-width: 640px) {
-    .flashcard-outer { min-height: 200px; }
-  }
+  @media (max-width: 640px) { .flashcard-outer { min-height: 200px; } }
 `;
 
 // ─── Main App ───
 export default function App() {
   const [sets, setSets] = useState([]);
+  const [folders, setFolders] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState({ page: "home" });
   const [theme, setTheme] = useState(() => localStorage.getItem("flashforge-theme") || "dark");
@@ -446,21 +447,30 @@ export default function App() {
   useEffect(() => {
     const data = storage.load();
     setSets(data && data.length > 0 ? data : SAMPLE_SETS);
+    setFolders(foldersStorage.load());
     setLoaded(true);
   }, []);
 
   useEffect(() => { if (loaded) storage.save(sets); }, [sets, loaded]);
-
-  useEffect(() => {
-    localStorage.setItem("flashforge-theme", theme);
-    document.body.style.background = t.bg;
-  }, [theme]);
+  useEffect(() => { if (loaded) foldersStorage.save(folders); }, [folders, loaded]);
+  useEffect(() => { localStorage.setItem("flashforge-theme", theme); document.body.style.background = t.bg; }, [theme]);
 
   const toggleTheme = () => setTheme(th => th === "dark" ? "light" : "dark");
-  const updateSet = (id, updater) => setSets(prev => prev.map(x => x.id === id ? updater(x) : x));
-  const deleteSet = (id) => { setSets(prev => prev.filter(x => x.id !== id)); setView({ page: "home" }); };
-  const addSet = (set) => { setSets(prev => [set, ...prev]); setView({ page: "detail", setId: set.id }); };
   const nav = (page, props = {}) => setView({ page, ...props });
+
+  // Set CRUD
+  const updateSet = (id, updater) => setSets(prev => prev.map(x => x.id === id ? updater(x) : x));
+  const deleteSet = (id) => { setSets(prev => prev.filter(x => x.id !== id)); nav("home"); };
+  const addSet = (set) => setSets(prev => [set, ...prev]);
+
+  // Folder CRUD
+  const addFolder = (folder) => setFolders(prev => [folder, ...prev]);
+  const updateFolder = (id, updater) => setFolders(prev => prev.map(f => f.id === id ? updater(f) : f));
+  const deleteFolder = (id) => {
+    setSets(prev => prev.map(s => s.folderId === id ? { ...s, folderId: null } : s));
+    setFolders(prev => prev.filter(f => f.id !== id));
+  };
+  const moveSetToFolder = (setId, folderId) => updateSet(setId, s => ({ ...s, folderId: folderId || null }));
 
   if (!loaded) {
     return (
@@ -473,18 +483,21 @@ export default function App() {
 
   const sharedProps = { S, t, theme, toggleTheme, nav };
   const currentSet = sets.find(x => x.id === view.setId);
+  const currentFolder = folders.find(f => f.id === view.folderId);
 
   return (
     <ThemeCtx.Provider value={t}>
       <div style={S.app}>
         <style>{globalCSS(t)}</style>
-        {view.page === "home"   && <HomePage sets={sets} {...sharedProps} />}
-        {view.page === "create" && <CreatePage addSet={addSet} {...sharedProps} />}
-        {view.page === "import" && <ImportPage addSet={addSet} {...sharedProps} />}
-        {view.page === "detail" && <DetailPage set={currentSet} updateSet={updateSet} deleteSet={deleteSet} {...sharedProps} />}
-        {view.page === "study"  && <StudyPage  set={currentSet} updateSet={updateSet} {...sharedProps} />}
-        {view.page === "test"   && <TestPage   set={currentSet} {...sharedProps} />}
-        {view.page === "edit"   && <EditPage   set={currentSet} updateSet={updateSet} {...sharedProps} />}
+        {view.page === "home"        && <HomePage sets={sets} folders={folders} addFolder={addFolder} {...sharedProps} />}
+        {view.page === "folder"      && <FolderPage folder={currentFolder} sets={sets} folders={folders} deleteFolder={deleteFolder} updateFolder={updateFolder} moveSetToFolder={moveSetToFolder} addSet={addSet} updateSet={updateSet} deleteSet={deleteSet} {...sharedProps} />}
+        {view.page === "folderStudy" && <FolderStudyPage folder={currentFolder} folderSets={sets.filter(x => x.folderId === view.folderId)} updateSet={updateSet} {...sharedProps} />}
+        {view.page === "create"      && <CreatePage addSet={addSet} folders={folders} folderId={view.folderId || null} {...sharedProps} />}
+        {view.page === "import"      && <ImportPage addSet={addSet} {...sharedProps} />}
+        {view.page === "detail"      && <DetailPage set={currentSet} folders={folders} updateSet={updateSet} deleteSet={deleteSet} moveSetToFolder={moveSetToFolder} {...sharedProps} />}
+        {view.page === "study"       && <StudyPage  set={currentSet} updateSet={updateSet} {...sharedProps} />}
+        {view.page === "test"        && <TestPage   set={currentSet} {...sharedProps} />}
+        {view.page === "edit"        && <EditPage   set={currentSet} updateSet={updateSet} {...sharedProps} />}
       </div>
     </ThemeCtx.Provider>
   );
@@ -503,8 +516,34 @@ function NavBar({ onBack, title, S, theme, toggleTheme }) {
   );
 }
 
+// ─── Set Card (shared between HomePage and FolderPage) ───
+function SetCard({ set, S, nav }) {
+  const dueCount = set.cards.filter(isDue).length;
+  return (
+    <button style={S.setCard} onClick={() => nav("detail", { setId: set.id })} className="set-card">
+      <div style={S.setCardTop}>
+        <span style={S.cardCount}>{set.cards.length} cards</span>
+        {dueCount > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: "#F87171", background: "rgba(239,68,68,0.12)", padding: "2px 8px", borderRadius: 6, fontFamily: "'Space Mono', monospace" }}>{dueCount} due</span>}
+      </div>
+      <h3 style={S.setTitle}>{set.title}</h3>
+      {set.description && <p style={S.setDesc}>{set.description}</p>}
+      <div style={S.setCardBottom}>
+        <span style={S.dateLabel}>{new Date(set.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+      </div>
+    </button>
+  );
+}
+
 // ─── Home Page ───
-function HomePage({ sets, S, t, theme, toggleTheme, nav }) {
+function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
+  const ungrouped = sets.filter(s => !s.folderId);
+  const hasContent = folders.length > 0 || ungrouped.length > 0;
+
+  const handleNewFolder = () => {
+    const name = window.prompt("Folder name:");
+    if (name?.trim()) addFolder({ id: uid(), name: name.trim(), createdAt: Date.now() });
+  };
+
   return (
     <div style={S.page}>
       <header style={S.header}>
@@ -521,59 +560,346 @@ function HomePage({ sets, S, t, theme, toggleTheme, nav }) {
 
       <div style={S.actionBar}>
         <button style={S.primaryBtn} onClick={() => nav("create")}><Icons.Plus /> New Set</button>
+        <button style={S.secondaryBtn} onClick={handleNewFolder}><Icons.FolderPlus /> New Folder</button>
         <button style={S.secondaryBtn} onClick={() => nav("import")}><Icons.Import /> Import</button>
       </div>
 
-      {sets.length === 0 ? (
+      {!hasContent && (
         <div style={S.emptyState}>
           <p style={{ fontSize: 48, marginBottom: 12 }}>📚</p>
           <p style={{ color: t.text2, fontSize: 15 }}>No flashcard sets yet. Create your first one!</p>
         </div>
-      ) : (
-        <div style={S.setGrid}>
-          {sets.map(set => {
-            const dueCount = set.cards.filter(isDue).length;
-            return (
-              <button key={set.id} style={S.setCard} onClick={() => nav("detail", { setId: set.id })} className="set-card">
-                <div style={S.setCardTop}>
-                  <span style={S.cardCount}>{set.cards.length} cards</span>
-                  {dueCount > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: "#F87171", background: "rgba(239,68,68,0.12)", padding: "2px 8px", borderRadius: 6, fontFamily: "'Space Mono', monospace" }}>{dueCount} due</span>}
-                </div>
-                <h3 style={S.setTitle}>{set.title}</h3>
-                {set.description && <p style={S.setDesc}>{set.description}</p>}
-                <div style={S.setCardBottom}>
-                  <span style={S.dateLabel}>{new Date(set.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+      )}
+
+      {folders.length > 0 && (
+        <>
+          <div style={S.sectionLabel}>Folders</div>
+          <div style={S.setGrid}>
+            {folders.map(folder => {
+              const folderSets = sets.filter(s => s.folderId === folder.id);
+              const totalCards = folderSets.reduce((a, s) => a + s.cards.length, 0);
+              const dueCount = folderSets.flatMap(s => s.cards).filter(isDue).length;
+              return (
+                <button key={folder.id} style={S.folderCard} onClick={() => nav("folder", { folderId: folder.id })} className="set-card">
+                  <div style={S.folderIconWrap}><Icons.Folder /></div>
+                  <h3 style={S.folderName}>{folder.name}</h3>
+                  <div style={S.folderMeta}>
+                    <span>{folderSets.length} sets · {totalCards} cards</span>
+                    {dueCount > 0 && <span style={{ color: "#F87171", fontWeight: 600 }}>{dueCount} due</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {ungrouped.length > 0 && (
+        <>
+          {folders.length > 0 && <div style={S.sectionLabel}>Sets</div>}
+          <div style={S.setGrid}>
+            {ungrouped.map(set => <SetCard key={set.id} set={set} S={S} nav={nav} />)}
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-// ─── Create Page ───
-function CreatePage({ addSet, S, theme, toggleTheme, nav }) {
-  const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
-  const [cards, setCards] = useState([newCard(), newCard(), newCard()]);
+// ─── Folder Page ───
+function FolderPage({ folder, sets, nav, S, t, theme, toggleTheme, deleteFolder, updateFolder }) {
+  const [renaming, setRenaming] = useState(false);
+  const [nameInput, setNameInput] = useState(folder?.name || "");
 
-  const updateField = (id, field, val) => setCards(c => c.map(x => x.id === id ? { ...x, [field]: val } : x));
-  const removeCard = (id) => cards.length > 1 && setCards(c => c.filter(x => x.id !== id));
-  const addCardRow = () => setCards(c => [...c, newCard()]);
+  if (!folder) return <div style={S.page}><NavBar onBack={() => nav("home")} title="Not Found" S={S} theme={theme} toggleTheme={toggleTheme} /></div>;
 
-  const validCards = cards.filter(c => c.term.trim() || c.termImage || c.termTable);
+  const folderSets = sets.filter(s => s.folderId === folder.id);
+  const totalCards = folderSets.reduce((a, s) => a + s.cards.length, 0);
+  const dueCount = folderSets.flatMap(s => s.cards).filter(isDue).length;
 
-  const handleSave = () => {
-    if (!title.trim() || validCards.length === 0) return;
-    addSet({ id: uid(), title: title.trim(), description: desc.trim(), createdAt: Date.now(), cards: validCards });
+  const handleRename = () => {
+    if (nameInput.trim()) updateFolder(folder.id, f => ({ ...f, name: nameInput.trim() }));
+    setRenaming(false);
+  };
+
+  const handleDelete = () => {
+    if (confirm(`Delete "${folder.name}"? All sets will be moved to root.`)) {
+      deleteFolder(folder.id);
+      nav("home");
+    }
   };
 
   return (
     <div style={S.page}>
-      <NavBar onBack={() => nav("home")} title="Create New Set" S={S} theme={theme} toggleTheme={toggleTheme} />
+      <NavBar onBack={() => nav("home")} title={folder.name} S={S} theme={theme} toggleTheme={toggleTheme} />
+
+      <div style={S.detailHeader}>
+        {renaming ? (
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={nameInput} onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") setRenaming(false); }}
+              autoFocus />
+            <button style={S.primaryBtn} onClick={handleRename}>Save</button>
+            <button style={S.secondaryBtn} onClick={() => setRenaming(false)}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <p style={{ color: t.text2, fontSize: 14 }}>
+              {folderSets.length} sets · {totalCards} cards{dueCount > 0 ? ` · ` : ""}
+              {dueCount > 0 && <span style={{ color: "#F87171" }}>{dueCount} due</span>}
+            </p>
+            <button style={S.iconBtn} onClick={() => { setNameInput(folder.name); setRenaming(true); }} title="Rename folder">
+              <Icons.Edit />
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button style={S.studyAllBtn} onClick={() => nav("folderStudy", { folderId: folder.id })} disabled={totalCards === 0}>
+            <Icons.Cards /> Study All Cards
+          </button>
+          <button style={S.secondaryBtn} onClick={() => nav("create", { folderId: folder.id })}>
+            <Icons.Plus /> New Set
+          </button>
+        </div>
+      </div>
+
+      {folderSets.length === 0 ? (
+        <div style={S.emptyState}>
+          <p style={{ fontSize: 36, marginBottom: 12 }}>📂</p>
+          <p style={{ color: t.text2, fontSize: 15 }}>No sets in this folder yet.</p>
+        </div>
+      ) : (
+        <div style={S.setGrid}>
+          {folderSets.map(set => <SetCard key={set.id} set={set} S={S} nav={nav} />)}
+        </div>
+      )}
+
+      <div style={{ padding: "0 24px 32px", maxWidth: 900, margin: "0 auto" }}>
+        <button style={S.dangerBtn} onClick={handleDelete}>
+          <Icons.Trash /> Delete Folder
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Study Core (shared between StudyPage and FolderStudyPage) ───
+function StudyCore({ studyCards, title, dueCount, onBack, onRate, S, t, theme, toggleTheme }) {
+  const [cardOrder, setCardOrder] = useState(() => studyCards.map((_, i) => i));
+  const [index, setIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [shuffled, setShuffled] = useState(false);
+  const [showInterval, setShowInterval] = useState(null);
+
+  const total = cardOrder.length;
+  const currentCard = studyCards[cardOrder[index]];
+  const progress = total > 0 ? (index / total) * 100 : 0;
+
+  const handleShuffle = () => {
+    const newOrder = shuffled ? studyCards.map((_, i) => i) : shuffle(studyCards.map((_, i) => i));
+    setCardOrder(newOrder);
+    setShuffled(!shuffled);
+    setIndex(0);
+    setFlipped(false);
+    setShowInterval(null);
+  };
+
+  const go = useCallback((dir) => {
+    setFlipped(false);
+    setShowInterval(null);
+    setTimeout(() => setIndex(i => {
+      if (dir === 1) return i < total - 1 ? i + 1 : 0;
+      return i > 0 ? i - 1 : total - 1;
+    }), 100);
+  }, [total]);
+
+  const handleRate = (rating) => {
+    const sm2 = computeSM2(currentCard, rating);
+    setShowInterval(sm2.interval);
+    onRate(currentCard, sm2);
+    setTimeout(() => {
+      setShowInterval(null);
+      if (index < total - 1) {
+        setFlipped(false);
+        setTimeout(() => setIndex(i => i + 1), 100);
+      }
+    }, 900);
+  };
+
+  const handleKey = useCallback((e) => {
+    if (e.key === " " || e.key === "Enter") { e.preventDefault(); setFlipped(f => !f); }
+    if (e.key === "ArrowRight") go(1);
+    if (e.key === "ArrowLeft") go(-1);
+  }, [go]);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [handleKey]);
+
+  return (
+    <div style={S.page}>
+      <NavBar onBack={onBack} title={title} S={S} theme={theme} toggleTheme={toggleTheme} />
+      <div style={S.studyContainer}>
+        <div style={S.progressWrap}><div style={{ ...S.progressBar, width: `${progress}%` }} /></div>
+        <div style={S.studyMeta}>
+          <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: t.text3 }}>
+            {index + 1} / {total}
+            {dueCount > 0 && <span style={{ color: "#F87171", marginLeft: 8 }}>{dueCount} due</span>}
+          </span>
+          <button style={{ ...S.iconBtn, ...(shuffled ? { color: "#6366F1" } : {}) }} onClick={handleShuffle} title="Shuffle">
+            <Icons.Shuffle />
+          </button>
+        </div>
+
+        <div style={S.flashcardOuter} onClick={() => setFlipped(f => !f)} className="flashcard-outer">
+          <div style={{ ...S.flashcardInner, transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }} className="flashcard-inner">
+            <div style={S.flashcardFace}>
+              <span style={S.faceLabel}>TERM</span>
+              {renderContent(currentCard?.term, currentCard?.termImage, currentCard?.termTable, S.faceText, "face-text")}
+              <span style={S.tapHint}>tap to flip</span>
+            </div>
+            <div style={{ ...S.flashcardFace, ...S.flashcardBack }}>
+              <span style={{ ...S.faceLabel, color: "#818CF8" }}>DEFINITION</span>
+              {renderContent(currentCard?.definition, currentCard?.defImage, currentCard?.defTable, S.faceText, "face-text")}
+            </div>
+          </div>
+        </div>
+
+        {showInterval !== null ? (
+          <div style={{ textAlign: "center", padding: "14px 0", color: "#818CF8", fontSize: 14, fontFamily: "'Space Mono', monospace", animation: "fadeIn 0.2s ease" }}>
+            Next review: {showInterval <= 1 ? "tomorrow" : `in ${showInterval} days`}
+          </div>
+        ) : (
+          <>
+            <div style={S.studyControls}>
+              <button style={S.navArrow} onClick={() => go(-1)}><Icons.ChevLeft /></button>
+              {flipped ? (
+                <>
+                  <button style={S.againBtn} onClick={() => handleRate(0)}>Again<span style={S.ratingHint}>{intervalLabel(currentCard, 0)}</span></button>
+                  <button style={S.hardBtn}  onClick={() => handleRate(1)}>Hard<span style={S.ratingHint}>{intervalLabel(currentCard, 1)}</span></button>
+                  <button style={S.goodBtn}  onClick={() => handleRate(2)}>Good<span style={S.ratingHint}>{intervalLabel(currentCard, 2)}</span></button>
+                  <button style={S.easyBtn}  onClick={() => handleRate(3)}>Easy<span style={S.ratingHint}>{intervalLabel(currentCard, 3)}</span></button>
+                </>
+              ) : (
+                <span style={{ color: t.text3, fontSize: 13, padding: "10px 20px" }}>Flip to rate</span>
+              )}
+              <button style={S.navArrow} onClick={() => go(1)}><Icons.ChevRight /></button>
+            </div>
+            <p style={{ color: t.text4, fontSize: 12, textAlign: "center", marginTop: 12, fontFamily: "'Space Mono', monospace" }}>
+              ← → navigate · space to flip
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Study Page (single set) ───
+function StudyPage({ set, nav, updateSet, S, t, theme, toggleTheme }) {
+  const [studyCards] = useState(() => {
+    if (!set) return [];
+    return [...set.cards].sort((a, b) => {
+      const aDue = isDue(a), bDue = isDue(b);
+      if (aDue && !bDue) return -1;
+      if (!aDue && bDue) return 1;
+      return (a.nextReview || 0) - (b.nextReview || 0);
+    });
+  });
+
+  if (!set) return null;
+
+  const onRate = (card, sm2) => {
+    updateSet(set.id, st => ({ ...st, cards: st.cards.map(c => c.id === card.id ? { ...c, ...sm2 } : c) }));
+  };
+
+  return (
+    <StudyCore
+      studyCards={studyCards}
+      title={set.title}
+      dueCount={set.cards.filter(isDue).length}
+      onBack={() => nav("detail", { setId: set.id })}
+      onRate={onRate}
+      S={S} t={t} theme={theme} toggleTheme={toggleTheme}
+    />
+  );
+}
+
+// ─── Folder Study Page (all sets in folder) ───
+function FolderStudyPage({ folder, folderSets, nav, updateSet, S, t, theme, toggleTheme }) {
+  const [studyCards] = useState(() => {
+    const allCards = folderSets.flatMap(s => s.cards);
+    return allCards.sort((a, b) => {
+      const aDue = isDue(a), bDue = isDue(b);
+      if (aDue && !bDue) return -1;
+      if (!aDue && bDue) return 1;
+      return (a.nextReview || 0) - (b.nextReview || 0);
+    });
+  });
+
+  const [cardSetMap] = useState(() => {
+    const map = {};
+    folderSets.forEach(s => s.cards.forEach(c => { map[c.id] = s.id; }));
+    return map;
+  });
+
+  if (!folder) return null;
+
+  const allCards = folderSets.flatMap(s => s.cards);
+  const dueCount = allCards.filter(isDue).length;
+
+  const onRate = (card, sm2) => {
+    const ownerSetId = cardSetMap[card.id];
+    if (ownerSetId) {
+      updateSet(ownerSetId, st => ({ ...st, cards: st.cards.map(c => c.id === card.id ? { ...c, ...sm2 } : c) }));
+    }
+  };
+
+  return (
+    <StudyCore
+      studyCards={studyCards}
+      title={`${folder.name} — All Cards`}
+      dueCount={dueCount}
+      onBack={() => nav("folder", { folderId: folder.id })}
+      onRate={onRate}
+      S={S} t={t} theme={theme} toggleTheme={toggleTheme}
+    />
+  );
+}
+
+// ─── Create Page ───
+function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [cards, setCards] = useState([newCard(), newCard(), newCard()]);
+
+  const folder = folders.find(f => f.id === folderId);
+  const updateField = (id, field, val) => setCards(c => c.map(x => x.id === id ? { ...x, [field]: val } : x));
+  const removeCard = (id) => cards.length > 1 && setCards(c => c.filter(x => x.id !== id));
+  const addCardRow = () => setCards(c => [...c, newCard()]);
+  const validCards = cards.filter(c => c.term.trim() || c.termImage || c.termTable);
+
+  const handleSave = () => {
+    if (!title.trim() || validCards.length === 0) return;
+    const id = uid();
+    addSet({ id, title: title.trim(), description: desc.trim(), createdAt: Date.now(), cards: validCards, folderId: folderId || null });
+    if (folderId) nav("folder", { folderId });
+    else nav("detail", { setId: id });
+  };
+
+  const backTarget = folderId ? () => nav("folder", { folderId }) : () => nav("home");
+
+  return (
+    <div style={S.page}>
+      <NavBar onBack={backTarget} title="Create New Set" S={S} theme={theme} toggleTheme={toggleTheme} />
       <div style={S.formSection}>
+        {folder && (
+          <div style={S.folderBreadcrumb}>
+            <Icons.Folder /><span>Adding to: <strong>{folder.name}</strong></span>
+          </div>
+        )}
         <input style={S.input} placeholder="Set title (e.g. Biology Chapter 5)" value={title} onChange={e => setTitle(e.target.value)} />
         <input style={S.input} placeholder="Description (optional)" value={desc} onChange={e => setDesc(e.target.value)} />
       </div>
@@ -615,10 +941,9 @@ function ImportPage({ addSet, S, t, theme, toggleTheme, nav }) {
 
   const handleImport = () => {
     if (!title.trim() || preview.length === 0) return;
-    addSet({
-      id: uid(), title: title.trim(), description: `Imported ${preview.length} cards`, createdAt: Date.now(),
-      cards: preview.map(p => ({ ...newCard(), id: uid(), term: p.term, definition: p.def })),
-    });
+    const id = uid();
+    addSet({ id, title: title.trim(), description: `Imported ${preview.length} cards`, createdAt: Date.now(), folderId: null, cards: preview.map(p => ({ ...newCard(), id: uid(), term: p.term, definition: p.def })) });
+    nav("detail", { setId: id });
   };
 
   return (
@@ -631,11 +956,9 @@ function ImportPage({ addSet, S, t, theme, toggleTheme, nav }) {
             <button key={v} onClick={() => setSep(v)} style={{ ...S.chipBtn, ...(sep === v ? S.chipActive : {}) }}>{l}</button>
           ))}
         </div>
-        <textarea
-          style={S.textarea} rows={8}
+        <textarea style={S.textarea} rows={8}
           placeholder={`Paste your terms here...\nExample:\nHola${sep === "tab" ? "\t" : sep === "comma" ? "," : " - "}Hello`}
-          value={raw} onChange={e => setRaw(e.target.value)}
-        />
+          value={raw} onChange={e => setRaw(e.target.value)} />
         {preview.length > 0 && (
           <div style={S.previewBox}>
             <p style={{ color: "#10B981", fontSize: 13, fontWeight: 600, marginBottom: 8 }}>✓ {preview.length} cards detected</p>
@@ -658,16 +981,23 @@ function ImportPage({ addSet, S, t, theme, toggleTheme, nav }) {
 }
 
 // ─── Detail Page ───
-function DetailPage({ set, nav, updateSet, deleteSet, S, t, theme, toggleTheme }) {
+function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, S, t, theme, toggleTheme }) {
   if (!set) return <div style={S.page}><NavBar onBack={() => nav("home")} title="Not Found" S={S} theme={theme} toggleTheme={toggleTheme} /></div>;
 
   const toggleStar = (cardId) => updateSet(set.id, st => ({ ...st, cards: st.cards.map(c => c.id === cardId ? { ...c, starred: !c.starred } : c) }));
   const dueCount = set.cards.filter(isDue).length;
+  const parentFolder = folders.find(f => f.id === set.folderId);
+  const backTarget = set.folderId ? () => nav("folder", { folderId: set.folderId }) : () => nav("home");
 
   return (
     <div style={S.page}>
-      <NavBar onBack={() => nav("home")} title={set.title} S={S} theme={theme} toggleTheme={toggleTheme} />
+      <NavBar onBack={backTarget} title={set.title} S={S} theme={theme} toggleTheme={toggleTheme} />
       <div style={S.detailHeader}>
+        {parentFolder && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: t.text3, fontSize: 13 }}>
+            <Icons.Folder /><span>{parentFolder.name}</span>
+          </div>
+        )}
         <p style={{ color: t.text2, fontSize: 14, marginBottom: 16 }}>{set.description || `${set.cards.length} cards`}</p>
         <div style={S.modeGrid}>
           <button style={S.modeBtn} onClick={() => nav("study", { setId: set.id })} disabled={set.cards.length === 0}>
@@ -681,6 +1011,16 @@ function DetailPage({ set, nav, updateSet, deleteSet, S, t, theme, toggleTheme }
             <Icons.Edit /><span>Edit</span>
           </button>
         </div>
+
+        {folders.length > 0 && (
+          <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: t.text3, fontSize: 13, whiteSpace: "nowrap" }}>Move to:</span>
+            <select style={S.folderSelect} value={set.folderId || ""} onChange={e => moveSetToFolder(set.id, e.target.value || null)}>
+              <option value="">No folder</option>
+              {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       <div style={S.cardListPreview}>
@@ -690,10 +1030,10 @@ function DetailPage({ set, nav, updateSet, deleteSet, S, t, theme, toggleTheme }
         {set.cards.map(card => (
           <div key={card.id} style={S.cardPreviewRow}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: t.text, fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
+              <div style={{ marginBottom: 4 }}>
                 {renderContent(card.term, card.termImage, card.termTable, { fontSize: 14, fontWeight: 500, color: t.text })}
               </div>
-              <div style={{ color: t.text3, fontSize: 13 }}>
+              <div>
                 {renderContent(card.definition, card.defImage, card.defTable, { fontSize: 13, color: t.text3 })}
               </div>
               {card.nextReview > 0 && (
@@ -758,132 +1098,6 @@ function EditPage({ set, nav, updateSet, S, theme, toggleTheme }) {
       <button style={S.addCardBtn} onClick={addCardRow}><Icons.Plus /> Add Card</button>
       <div style={{ padding: "16px 24px 32px", maxWidth: 900, margin: "0 auto" }}>
         <button style={{ ...S.primaryBtn, width: "100%" }} onClick={handleSave}>Save Changes</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Study Page ───
-function StudyPage({ set, nav, updateSet, S, t, theme, toggleTheme }) {
-  const [studyCards] = useState(() => {
-    if (!set) return [];
-    return [...set.cards].sort((a, b) => {
-      const aDue = isDue(a), bDue = isDue(b);
-      if (aDue && !bDue) return -1;
-      if (!aDue && bDue) return 1;
-      return (a.nextReview || 0) - (b.nextReview || 0);
-    });
-  });
-
-  const [index, setIndex] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const [shuffled, setShuffled] = useState(false);
-  const [cardOrder, setCardOrder] = useState(() => studyCards.map((_, i) => i));
-  const [showInterval, setShowInterval] = useState(null);
-
-  if (!set) return null;
-
-  const total = cardOrder.length;
-  const currentCard = studyCards[cardOrder[index]];
-  const dueCount = set.cards.filter(isDue).length;
-  const progress = total > 0 ? (index / total) * 100 : 0;
-
-  const handleShuffle = () => {
-    const newOrder = shuffled ? studyCards.map((_, i) => i) : shuffle(studyCards.map((_, i) => i));
-    setCardOrder(newOrder);
-    setShuffled(!shuffled);
-    setIndex(0);
-    setFlipped(false);
-    setShowInterval(null);
-  };
-
-  const go = (dir) => {
-    setFlipped(false);
-    setShowInterval(null);
-    setTimeout(() => setIndex(i => {
-      if (dir === 1) return i < total - 1 ? i + 1 : 0;
-      return i > 0 ? i - 1 : total - 1;
-    }), 100);
-  };
-
-  const rateCard = (rating) => {
-    const sm2 = computeSM2(currentCard, rating);
-    setShowInterval(sm2.interval);
-    updateSet(set.id, st => ({ ...st, cards: st.cards.map(c => c.id === currentCard.id ? { ...c, ...sm2 } : c) }));
-    setTimeout(() => {
-      setShowInterval(null);
-      if (index < total - 1) {
-        setFlipped(false);
-        setTimeout(() => setIndex(i => i + 1), 100);
-      }
-    }, 900);
-  };
-
-  const handleKey = useCallback((e) => {
-    if (e.key === " " || e.key === "Enter") { e.preventDefault(); setFlipped(f => !f); }
-    if (e.key === "ArrowRight") go(1);
-    if (e.key === "ArrowLeft") go(-1);
-  }, [index, total]);
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [handleKey]);
-
-  return (
-    <div style={S.page}>
-      <NavBar onBack={() => nav("detail", { setId: set.id })} title={set.title} S={S} theme={theme} toggleTheme={toggleTheme} />
-      <div style={S.studyContainer}>
-        <div style={S.progressWrap}><div style={{ ...S.progressBar, width: `${progress}%` }} /></div>
-        <div style={S.studyMeta}>
-          <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: t.text3 }}>
-            {index + 1} / {total}
-            {dueCount > 0 && <span style={{ color: "#F87171", marginLeft: 8 }}>{dueCount} due</span>}
-          </span>
-          <button style={{ ...S.iconBtn, ...(shuffled ? { color: "#6366F1" } : {}) }} onClick={handleShuffle} title="Shuffle">
-            <Icons.Shuffle />
-          </button>
-        </div>
-
-        <div style={S.flashcardOuter} onClick={() => setFlipped(f => !f)} className="flashcard-outer">
-          <div style={{ ...S.flashcardInner, transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }} className="flashcard-inner">
-            <div style={S.flashcardFace}>
-              <span style={S.faceLabel}>TERM</span>
-              {renderContent(currentCard?.term, currentCard?.termImage, currentCard?.termTable, S.faceText, "face-text")}
-              <span style={S.tapHint}>tap to flip</span>
-            </div>
-            <div style={{ ...S.flashcardFace, ...S.flashcardBack }}>
-              <span style={{ ...S.faceLabel, color: "#818CF8" }}>DEFINITION</span>
-              {renderContent(currentCard?.definition, currentCard?.defImage, currentCard?.defTable, S.faceText, "face-text")}
-            </div>
-          </div>
-        </div>
-
-        {showInterval !== null ? (
-          <div style={{ textAlign: "center", padding: "14px 0", color: "#818CF8", fontSize: 14, fontFamily: "'Space Mono', monospace", animation: "fadeIn 0.2s ease" }}>
-            Next review: {showInterval <= 1 ? "tomorrow" : `in ${showInterval} days`}
-          </div>
-        ) : (
-          <>
-            <div style={S.studyControls}>
-              <button style={S.navArrow} onClick={() => go(-1)}><Icons.ChevLeft /></button>
-              {flipped ? (
-                <>
-                  <button style={S.againBtn} onClick={() => rateCard(0)}>Again<span style={S.ratingHint}>{intervalLabel(currentCard, 0)}</span></button>
-                  <button style={S.hardBtn}  onClick={() => rateCard(1)}>Hard<span style={S.ratingHint}>{intervalLabel(currentCard, 1)}</span></button>
-                  <button style={S.goodBtn}  onClick={() => rateCard(2)}>Good<span style={S.ratingHint}>{intervalLabel(currentCard, 2)}</span></button>
-                  <button style={S.easyBtn}  onClick={() => rateCard(3)}>Easy<span style={S.ratingHint}>{intervalLabel(currentCard, 3)}</span></button>
-                </>
-              ) : (
-                <span style={{ color: t.text3, fontSize: 13, padding: "10px 20px" }}>Flip to rate</span>
-              )}
-              <button style={S.navArrow} onClick={() => go(1)}><Icons.ChevRight /></button>
-            </div>
-            <p style={{ color: t.text4, fontSize: 12, textAlign: "center", marginTop: 12, fontFamily: "'Space Mono', monospace" }}>
-              ← → navigate · space to flip
-            </p>
-          </>
-        )}
       </div>
     </div>
   );
