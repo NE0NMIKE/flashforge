@@ -91,6 +91,8 @@ const Icons = {
   Table: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>,
   Folder: () => <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>,
   FolderPlus: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><path d="M12 11v6M9 14h6"/></svg>,
+  Download: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>,
+  Search: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>,
 };
 
 // ─── Storage ───
@@ -364,7 +366,7 @@ function makeStyles(t) {
     cardCount: { fontSize: 11, fontWeight: 600, color: "#818CF8", background: "rgba(99,102,241,0.12)", padding: "2px 8px", borderRadius: 6, fontFamily: "'Space Mono', monospace" },
     setTitle: { color: t.text, fontSize: 15, fontWeight: 600, marginBottom: 4, lineHeight: 1.3 },
     setDesc: { color: t.text3, fontSize: 12, flex: 1, lineHeight: 1.4 },
-    setCardBottom: { marginTop: "auto", paddingTop: 8 },
+    setCardBottom: { marginTop: "auto", paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 },
     dateLabel: { color: t.text4, fontSize: 11, fontFamily: "'Space Mono', monospace" },
     emptyState: { textAlign: "center", padding: "60px 20px" },
 
@@ -402,6 +404,7 @@ function makeStyles(t) {
     modeGrid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 },
     modeBtn: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "18px 12px", background: "linear-gradient(135deg, #312E81, #4338CA)", border: "none", borderRadius: 12, color: "#E2E8F0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", position: "relative" },
     dueBadge: { position: "absolute", top: -6, right: -6, background: "#EF4444", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "2px 6px", fontFamily: "'Space Mono', monospace" },
+    statPill: { display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, fontFamily: "'Space Mono', monospace" },
     cardListPreview: { padding: "0 24px 20px", maxWidth: 900, margin: "0 auto" },
     cardPreviewRow: { display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, marginBottom: 6 },
     folderSelect: { background: t.selectBg, border: `1px solid ${t.border}`, borderRadius: 8, padding: "8px 12px", color: t.text, fontSize: 13, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", flex: 1 },
@@ -425,6 +428,7 @@ function makeStyles(t) {
     goodBtn: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "8px 14px", background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 10, color: "#34D399", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
     easyBtn: { display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "8px 14px", background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 10, color: "#818CF8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
     ratingHint: { fontSize: 10, opacity: 0.7, fontFamily: "'Space Mono', monospace" },
+    keyHint: { fontSize: 10, opacity: 0.5, fontFamily: "'Space Mono', monospace", background: "rgba(255,255,255,0.1)", borderRadius: 3, padding: "0 3px", marginLeft: 2 },
 
     // Test
     testContainer: { padding: "20px 24px 32px", maxWidth: 900, margin: "0 auto" },
@@ -525,7 +529,7 @@ export default function App() {
         {view.page === "create"      && <CreatePage addSet={addSet} folders={folders} folderId={view.folderId || null} {...sharedProps} />}
         {view.page === "import"      && <ImportPage addSet={addSet} {...sharedProps} />}
         {view.page === "detail"      && <DetailPage set={currentSet} folders={folders} updateSet={updateSet} deleteSet={deleteSet} moveSetToFolder={moveSetToFolder} {...sharedProps} />}
-        {view.page === "study"       && <StudyPage  set={currentSet} updateSet={updateSet} {...sharedProps} />}
+        {view.page === "study"       && <StudyPage  set={currentSet} updateSet={updateSet} starredOnly={!!view.starredOnly} {...sharedProps} />}
         {view.page === "test"        && <TestPage   set={currentSet} {...sharedProps} />}
         {view.page === "edit"        && <EditPage   set={currentSet} updateSet={updateSet} {...sharedProps} />}
       </div>
@@ -547,7 +551,7 @@ function NavBar({ onBack, title, S, theme, toggleTheme }) {
 }
 
 // ─── Set Card (shared between HomePage and FolderPage) ───
-function SetCard({ set, S, nav }) {
+function SetCard({ set, S, nav, folderName }) {
   const dueCount = set.cards.filter(isDue).length;
   return (
     <button style={S.setCard} onClick={() => nav("detail", { setId: set.id })} className="set-card">
@@ -559,6 +563,7 @@ function SetCard({ set, S, nav }) {
       {set.description && <p style={S.setDesc}>{set.description}</p>}
       <div style={S.setCardBottom}>
         <span style={S.dateLabel}>{new Date(set.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+        {folderName && <span style={{ fontSize: 11, color: "#FBBF24", display: "flex", alignItems: "center", gap: 3 }}><Icons.Folder />{folderName}</span>}
       </div>
     </button>
   );
@@ -566,8 +571,19 @@ function SetCard({ set, S, nav }) {
 
 // ─── Home Page ───
 function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
+  const [search, setSearch] = useState("");
   const ungrouped = sets.filter(s => !s.folderId);
   const hasContent = folders.length > 0 || ungrouped.length > 0;
+  const query = search.trim().toLowerCase();
+  const searchResults = query
+    ? sets.filter(s =>
+        s.title.toLowerCase().includes(query) ||
+        s.cards.some(c =>
+          c.term.toLowerCase().includes(query) ||
+          c.definition.toLowerCase().includes(query)
+        )
+      )
+    : [];
 
   const handleNewFolder = () => {
     const name = window.prompt("Folder name:");
@@ -586,6 +602,17 @@ function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
             {theme === "dark" ? <Icons.Sun /> : <Icons.Moon />}
           </button>
         </div>
+        {sets.length > 0 && (
+          <div style={{ position: "relative", marginTop: 16 }}>
+            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: t.text4, pointerEvents: "none" }}><Icons.Search /></span>
+            <input
+              style={{ ...S.input, marginBottom: 0, paddingLeft: 36 }}
+              placeholder="Search sets and cards…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        )}
       </header>
 
       <div style={S.actionBar}>
@@ -594,42 +621,63 @@ function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
         <button style={S.secondaryBtn} onClick={() => nav("import")}><Icons.Import /> Import</button>
       </div>
 
-      {!hasContent && (
-        <div style={S.emptyState}>
-          <p style={{ fontSize: 48, marginBottom: 12 }}>📚</p>
-          <p style={{ color: t.text2, fontSize: 15 }}>No flashcard sets yet. Create your first one!</p>
-        </div>
-      )}
-
-      {folders.length > 0 && (
-        <>
-          <div style={S.sectionLabel}>Folders</div>
-          <div style={S.setGrid}>
-            {folders.map(folder => {
-              const folderSets = sets.filter(s => s.folderId === folder.id);
-              const totalCards = folderSets.reduce((a, s) => a + s.cards.length, 0);
-              const dueCount = folderSets.flatMap(s => s.cards).filter(isDue).length;
-              return (
-                <button key={folder.id} style={S.folderCard} onClick={() => nav("folder", { folderId: folder.id })} className="set-card">
-                  <div style={S.folderIconWrap}><Icons.Folder /></div>
-                  <h3 style={S.folderName}>{folder.name}</h3>
-                  <div style={S.folderMeta}>
-                    <span>{folderSets.length} sets · {totalCards} cards</span>
-                    {dueCount > 0 && <span style={{ color: "#F87171", fontWeight: 600 }}>{dueCount} due</span>}
-                  </div>
-                </button>
-              );
-            })}
+      {query ? (
+        searchResults.length === 0 ? (
+          <div style={S.emptyState}>
+            <p style={{ fontSize: 36, marginBottom: 12 }}>🔍</p>
+            <p style={{ color: t.text2, fontSize: 15 }}>No sets match "{search}"</p>
           </div>
-        </>
-      )}
-
-      {ungrouped.length > 0 && (
+        ) : (
+          <>
+            <div style={S.sectionLabel}>{searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for "{search}"</div>
+            <div style={S.setGrid}>
+              {searchResults.map(set => {
+                const folder = folders.find(f => f.id === set.folderId);
+                return <SetCard key={set.id} set={set} S={S} nav={nav} folderName={folder?.name} />;
+              })}
+            </div>
+          </>
+        )
+      ) : (
         <>
-          {folders.length > 0 && <div style={S.sectionLabel}>Sets</div>}
-          <div style={S.setGrid}>
-            {ungrouped.map(set => <SetCard key={set.id} set={set} S={S} nav={nav} />)}
-          </div>
+          {!hasContent && (
+            <div style={S.emptyState}>
+              <p style={{ fontSize: 48, marginBottom: 12 }}>📚</p>
+              <p style={{ color: t.text2, fontSize: 15 }}>No flashcard sets yet. Create your first one!</p>
+            </div>
+          )}
+
+          {folders.length > 0 && (
+            <>
+              <div style={S.sectionLabel}>Folders</div>
+              <div style={S.setGrid}>
+                {folders.map(folder => {
+                  const folderSets = sets.filter(s => s.folderId === folder.id);
+                  const totalCards = folderSets.reduce((a, s) => a + s.cards.length, 0);
+                  const dueCount = folderSets.flatMap(s => s.cards).filter(isDue).length;
+                  return (
+                    <button key={folder.id} style={S.folderCard} onClick={() => nav("folder", { folderId: folder.id })} className="set-card">
+                      <div style={S.folderIconWrap}><Icons.Folder /></div>
+                      <h3 style={S.folderName}>{folder.name}</h3>
+                      <div style={S.folderMeta}>
+                        <span>{folderSets.length} sets · {totalCards} cards</span>
+                        {dueCount > 0 && <span style={{ color: "#F87171", fontWeight: 600 }}>{dueCount} due</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {ungrouped.length > 0 && (
+            <>
+              {folders.length > 0 && <div style={S.sectionLabel}>Sets</div>}
+              <div style={S.setGrid}>
+                {ungrouped.map(set => <SetCard key={set.id} set={set} S={S} nav={nav} />)}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -761,7 +809,11 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, S, t, theme, t
     if (e.key === " " || e.key === "Enter") { e.preventDefault(); setFlipped(f => !f); }
     if (e.key === "ArrowRight") go(1);
     if (e.key === "ArrowLeft") go(-1);
-  }, [go]);
+    if (flipped && showInterval === null) {
+      const ratingKeys = { "1": 0, "2": 1, "3": 2, "4": 3 };
+      if (ratingKeys[e.key] !== undefined) { e.preventDefault(); handleRate(ratingKeys[e.key]); }
+    }
+  }, [go, flipped, showInterval, handleRate]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKey);
@@ -807,10 +859,10 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, S, t, theme, t
               <button style={S.navArrow} onClick={() => go(-1)}><Icons.ChevLeft /></button>
               {flipped ? (
                 <>
-                  <button style={S.againBtn} onClick={() => handleRate(0)}>Again<span style={S.ratingHint}>{intervalLabel(currentCard, 0)}</span></button>
-                  <button style={S.hardBtn}  onClick={() => handleRate(1)}>Hard<span style={S.ratingHint}>{intervalLabel(currentCard, 1)}</span></button>
-                  <button style={S.goodBtn}  onClick={() => handleRate(2)}>Good<span style={S.ratingHint}>{intervalLabel(currentCard, 2)}</span></button>
-                  <button style={S.easyBtn}  onClick={() => handleRate(3)}>Easy<span style={S.ratingHint}>{intervalLabel(currentCard, 3)}</span></button>
+                  <button style={S.againBtn} onClick={() => handleRate(0)}>Again <span style={S.keyHint}>1</span><span style={S.ratingHint}>{intervalLabel(currentCard, 0)}</span></button>
+                  <button style={S.hardBtn}  onClick={() => handleRate(1)}>Hard <span style={S.keyHint}>2</span><span style={S.ratingHint}>{intervalLabel(currentCard, 1)}</span></button>
+                  <button style={S.goodBtn}  onClick={() => handleRate(2)}>Good <span style={S.keyHint}>3</span><span style={S.ratingHint}>{intervalLabel(currentCard, 2)}</span></button>
+                  <button style={S.easyBtn}  onClick={() => handleRate(3)}>Easy <span style={S.keyHint}>4</span><span style={S.ratingHint}>{intervalLabel(currentCard, 3)}</span></button>
                 </>
               ) : (
                 <span style={{ color: t.text3, fontSize: 13, padding: "10px 20px" }}>Flip to rate</span>
@@ -818,7 +870,7 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, S, t, theme, t
               <button style={S.navArrow} onClick={() => go(1)}><Icons.ChevRight /></button>
             </div>
             <p style={{ color: t.text4, fontSize: 12, textAlign: "center", marginTop: 12, fontFamily: "'Space Mono', monospace" }}>
-              ← → navigate · space to flip
+              ← → navigate · space to flip · 1–4 to rate
             </p>
           </>
         )}
@@ -828,10 +880,11 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, S, t, theme, t
 }
 
 // ─── Study Page (single set) ───
-function StudyPage({ set, nav, updateSet, S, t, theme, toggleTheme }) {
+function StudyPage({ set, nav, updateSet, starredOnly, S, t, theme, toggleTheme }) {
   const [studyCards] = useState(() => {
     if (!set) return [];
-    return [...set.cards].sort((a, b) => {
+    const source = starredOnly ? set.cards.filter(c => c.starred) : set.cards;
+    return [...source].sort((a, b) => {
       const aDue = isDue(a), bDue = isDue(b);
       if (aDue && !bDue) return -1;
       if (!aDue && bDue) return 1;
@@ -848,8 +901,8 @@ function StudyPage({ set, nav, updateSet, S, t, theme, toggleTheme }) {
   return (
     <StudyCore
       studyCards={studyCards}
-      title={set.title}
-      dueCount={set.cards.filter(isDue).length}
+      title={starredOnly ? `${set.title} — Starred` : set.title}
+      dueCount={studyCards.filter(isDue).length}
       onBack={() => nav("detail", { setId: set.id })}
       onRate={onRate}
       S={S} t={t} theme={theme} toggleTheme={toggleTheme}
@@ -1016,6 +1069,19 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
 
   const toggleStar = (cardId) => updateSet(set.id, st => ({ ...st, cards: st.cards.map(c => c.id === cardId ? { ...c, starred: !c.starred } : c) }));
   const dueCount = set.cards.filter(isDue).length;
+  const starredCount = set.cards.filter(c => c.starred).length;
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(set, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${set.title.replace(/[^a-z0-9]/gi, "_")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   const parentFolder = folders.find(f => f.id === set.folderId);
   const backTarget = set.folderId ? () => nav("folder", { folderId: set.folderId }) : () => nav("home");
 
@@ -1028,15 +1094,37 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
             <Icons.Folder /><span>{parentFolder.name}</span>
           </div>
         )}
-        <p style={{ color: t.text2, fontSize: 14, marginBottom: 16 }}>{set.description || `${set.cards.length} cards`}</p>
-        <div style={S.modeGrid}>
+        {set.description && <p style={{ color: t.text2, fontSize: 14, marginBottom: 10 }}>{set.description}</p>}
+        {(() => {
+          const now = Date.now();
+          const newC = set.cards.filter(c => c.repetitions === 0).length;
+          const dueC = set.cards.filter(c => c.repetitions > 0 && c.nextReview <= now).length;
+          const scheduledC = set.cards.filter(c => c.repetitions > 0 && c.nextReview > now).length;
+          return (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              <span style={{ ...S.statPill, background: "rgba(99,102,241,0.15)", color: "#818CF8" }}>{newC} new</span>
+              {dueC > 0 && <span style={{ ...S.statPill, background: "rgba(248,113,113,0.15)", color: "#F87171" }}>{dueC} due</span>}
+              {scheduledC > 0 && <span style={{ ...S.statPill, background: "rgba(52,211,153,0.15)", color: "#34D399" }}>{scheduledC} scheduled</span>}
+            </div>
+          );
+        })()}
+        <div style={{ ...S.modeGrid, gridTemplateColumns: starredCount > 0 ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr" }}>
           <button style={S.modeBtn} onClick={() => nav("study", { setId: set.id })} disabled={set.cards.length === 0}>
             <Icons.Cards /><span>Flashcards</span>
             {dueCount > 0 && <span style={S.dueBadge}>{dueCount}</span>}
           </button>
-          <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #065F46, #047857)" }} onClick={() => nav("test", { setId: set.id })} disabled={set.cards.length < 4}>
-            <Icons.Test /><span>Test</span>
-          </button>
+          {starredCount > 0 && (
+            <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #92400E, #B45309)" }} onClick={() => nav("study", { setId: set.id, starredOnly: true })}>
+              <Icons.Star filled /><span>Starred</span>
+              <span style={S.dueBadge}>{starredCount}</span>
+            </button>
+          )}
+          <div style={{ position: "relative" }} title={set.cards.length < 4 ? "Need ≥ 4 cards to test" : ""}>
+            <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #065F46, #047857)", width: "100%", opacity: set.cards.length < 4 ? 0.5 : 1 }} onClick={() => nav("test", { setId: set.id })} disabled={set.cards.length < 4}>
+              <Icons.Test /><span>Test</span>
+              {set.cards.length < 4 && <span style={{ fontSize: 9, opacity: 0.8, fontFamily: "'Space Mono', monospace", marginTop: -4 }}>need ≥ 4 cards</span>}
+            </button>
+          </div>
           <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #7C3AED, #6D28D9)" }} onClick={() => nav("edit", { setId: set.id })}>
             <Icons.Edit /><span>Edit</span>
           </button>
@@ -1077,7 +1165,10 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
         ))}
       </div>
 
-      <div style={{ padding: "0 24px 32px", maxWidth: 900, margin: "0 auto" }}>
+      <div style={{ padding: "0 24px 32px", maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 10 }}>
+        <button style={S.secondaryBtn} onClick={handleExport}>
+          <Icons.Download /> Export as JSON
+        </button>
         <button style={S.dangerBtn} onClick={() => { if (confirm("Delete this set?")) deleteSet(set.id); }}>
           <Icons.Trash /> Delete Set
         </button>
