@@ -336,6 +336,8 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
   const fileRef = useRef();
   const textareaRef = useRef();
   const setTextareaRef = (el) => { textareaRef.current = el; if (inputRef) inputRef.current = el; };
+  const undoStack = useRef([]);
+  const commitChange = (newVal) => { undoStack.current.push(textValue); onTextChange(newVal); };
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -387,7 +389,7 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
       ? block.replace(/^• /gm, "")
       : block.replace(/^/gm, "• ");
     const newVal = val.slice(0, lineStart) + newBlock + val.slice(lineEnd === -1 ? val.length : lineEnd);
-    onTextChange(newVal);
+    commitChange(newVal);
     requestAnimationFrame(() => el.focus());
   };
 
@@ -397,7 +399,7 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     const selected = textValue.slice(ss, se);
     const insert = `${before}${selected}${after}`;
     const newVal = textValue.slice(0, ss) + insert + textValue.slice(se);
-    onTextChange(newVal);
+    commitChange(newVal);
     requestAnimationFrame(() => {
       el.focus();
       el.selectionStart = selected ? ss : ss + before.length;
@@ -415,7 +417,7 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     const insert = selected ? `$${selected}$` : `$$\n\n$$`;
     const cursor = selected ? ss + insert.length : ss + 3;
     const newVal = textValue.slice(0, ss) + insert + textValue.slice(se);
-    onTextChange(newVal);
+    commitChange(newVal);
     requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = cursor; });
   };
 
@@ -424,24 +426,40 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     const { selectionStart: ss, selectionEnd: se } = el;
     const val = textValue;
 
-    if (e.ctrlKey && e.key === "m") { e.preventDefault(); onFocusNext?.(); return; }
-    if (e.ctrlKey && e.key === "n") { e.preventDefault(); onFocusPrev?.(); return; }
+    if (!e.shiftKey && e.ctrlKey && e.key === "z") {
+      e.preventDefault();
+      if (undoStack.current.length > 0) { onTextChange(undoStack.current.pop()); }
+      return;
+    }
 
-    if (e.key === "Tab") {
+    if (e.ctrlKey && e.key === "m") {
       e.preventDefault();
       const lineStart = val.lastIndexOf("\n", ss - 1) + 1;
       const lineEnd = val.indexOf("\n", se);
       const block = val.slice(lineStart, lineEnd === -1 ? val.length : lineEnd);
-      const newBlock = e.shiftKey
-        ? block.replace(/^  /gm, "")
-        : block.replace(/^/gm, "  ");
+      const newBlock = block.replace(/^/gm, "  ");
       const delta = newBlock.length - block.length;
       const newVal = val.slice(0, lineStart) + newBlock + val.slice(lineEnd === -1 ? val.length : lineEnd);
-      onTextChange(newVal);
-      requestAnimationFrame(() => {
-        el.selectionStart = Math.max(lineStart, ss + (e.shiftKey ? Math.max(delta, lineStart - ss) : 2));
-        el.selectionEnd = se + delta;
-      });
+      commitChange(newVal);
+      requestAnimationFrame(() => { el.selectionStart = Math.max(lineStart, ss + 2); el.selectionEnd = se + delta; });
+      return;
+    }
+    if (e.ctrlKey && e.key === "n") {
+      e.preventDefault();
+      const lineStart = val.lastIndexOf("\n", ss - 1) + 1;
+      const lineEnd = val.indexOf("\n", se);
+      const block = val.slice(lineStart, lineEnd === -1 ? val.length : lineEnd);
+      const newBlock = block.replace(/^  /gm, "");
+      const delta = newBlock.length - block.length;
+      const newVal = val.slice(0, lineStart) + newBlock + val.slice(lineEnd === -1 ? val.length : lineEnd);
+      commitChange(newVal);
+      requestAnimationFrame(() => { el.selectionStart = Math.max(lineStart, ss + delta); el.selectionEnd = se + delta; });
+      return;
+    }
+
+    if (e.key === "Tab") {
+      e.preventDefault();
+      if (e.shiftKey) { onFocusPrev?.(); } else { onFocusNext?.(); }
     }
 
     if (e.key === "Enter") {
@@ -452,12 +470,12 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
         e.preventDefault();
         if (currentLine.trim() === "•") {
           const newVal = val.slice(0, lineStart) + val.slice(ss);
-          onTextChange(newVal);
+          commitChange(newVal);
           requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = lineStart; });
         } else {
           const insert = "\n" + bulletMatch[1];
           const newVal = val.slice(0, ss) + insert + val.slice(ss);
-          onTextChange(newVal);
+          commitChange(newVal);
           requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = ss + insert.length; });
         }
       }
@@ -488,7 +506,7 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     <div style={{ flex: 1, minWidth: 200 }}>
       <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>{label}</label>
       <textarea ref={setTextareaRef} style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "none", minHeight: 60, overflow: "hidden" }}
-        value={textValue} onChange={e => onTextChange(e.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown}
+        value={textValue} onChange={e => commitChange(e.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown}
         placeholder={`Enter ${label.toLowerCase()} — or paste an image with Ctrl+V`} rows={2} />
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
         <button style={toolbarBtn(false)} onClick={handleBold}     type="button"><b>B</b></button>
@@ -1158,14 +1176,17 @@ function ShortcutHelper() {
   const t = useContext(ThemeCtx);
   const [open, setOpen] = useState(false);
   const shortcuts = [
+    { keys: ["Ctrl", "Z"],          desc: "Undo last change" },
     { keys: ["Ctrl", "Enter"],      desc: "Save set" },
     { keys: ["Ctrl", "⇧", "Enter"], desc: "Add new card" },
     { keys: ["Ctrl", "Delete"],     desc: "Delete focused card" },
     { keys: ["Ctrl", "B"],          desc: "Bold selected text" },
     { keys: ["Ctrl", "I"],          desc: "Italic selected text" },
     { keys: ["Ctrl", "L"],          desc: "Toggle bullet list" },
-    { keys: ["Tab"],                desc: "Indent line" },
-    { keys: ["⇧", "Tab"],          desc: "Dedent line" },
+    { keys: ["Tab"],                desc: "Move to next field" },
+    { keys: ["⇧", "Tab"],          desc: "Move to previous field" },
+    { keys: ["Ctrl", "M"],          desc: "Indent line" },
+    { keys: ["Ctrl", "N"],          desc: "Dedent line" },
     { keys: ["Enter"],              desc: "Continue bullet on next line" },
     { keys: ["Ctrl", "V"],          desc: "Paste image from clipboard" },
     { keys: ["∑ Eq"],              desc: "Insert equation ($...$ or $$...$$)" },
