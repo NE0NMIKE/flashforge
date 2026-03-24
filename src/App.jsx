@@ -334,7 +334,7 @@ function renderContent(text, image, table, textStyle, textClass) {
   );
 }
 
-function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange, table, onTableChange }) {
+function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange, table, onTableChange, inputRef, onFocusNext, onFocusPrev }) {
   const t = useContext(ThemeCtx);
   const [showImage, setShowImage] = useState(!!image);
   const [showTable, setShowTable] = useState(!!table);
@@ -342,6 +342,7 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
   const textareaRef = useRef();
+  const setTextareaRef = (el) => { textareaRef.current = el; if (inputRef) inputRef.current = el; };
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -430,6 +431,12 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     const { selectionStart: ss, selectionEnd: se } = el;
     const val = textValue;
 
+    if (e.ctrlKey && e.key === "Tab") {
+      e.preventDefault();
+      if (e.altKey) { onFocusPrev?.(); } else { onFocusNext?.(); }
+      return;
+    }
+
     if (e.key === "Tab") {
       e.preventDefault();
       const lineStart = val.lastIndexOf("\n", ss - 1) + 1;
@@ -490,7 +497,7 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
   return (
     <div style={{ flex: 1, minWidth: 200 }}>
       <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>{label}</label>
-      <textarea ref={textareaRef} style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "none", minHeight: 60, overflow: "hidden" }}
+      <textarea ref={setTextareaRef} style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "none", minHeight: 60, overflow: "hidden" }}
         value={textValue} onChange={e => onTextChange(e.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown}
         placeholder={`Enter ${label.toLowerCase()} — or paste an image with Ctrl+V`} rows={2} />
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
@@ -1212,10 +1219,24 @@ function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
   const [desc, setDesc] = useState(draft?.desc || "");
   const [cards, setCards] = useState(draft?.cards?.length ? draft.cards.map(c => ({ ...newCard(), ...c })) : [newCard(), newCard(), newCard()]);
   const [draftRestored, setDraftRestored] = useState(hasDraft);
+  const cardRefs = useRef({});
+  const prevCardCount = useRef(cards.length);
+  const getRef = (cardId, field) => {
+    if (!cardRefs.current[cardId]) cardRefs.current[cardId] = { term: { current: null }, def: { current: null } };
+    return cardRefs.current[cardId][field];
+  };
 
   useEffect(() => {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, desc, cards }));
   }, [title, desc, cards]);
+
+  useEffect(() => {
+    if (cards.length > prevCardCount.current) {
+      const lastCard = cards[cards.length - 1];
+      getRef(lastCard.id, "term").current?.focus();
+    }
+    prevCardCount.current = cards.length;
+  }, [cards.length]);
 
   const folder = folders.find(f => f.id === folderId);
   const updateField = (id, field, val) => setCards(c => c.map(x => x.id === id ? { ...x, [field]: val } : x));
@@ -1268,8 +1289,8 @@ function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
               {cards.length > 1 && <button style={S.iconBtn} onClick={() => removeCard(card.id)}><Icons.Trash /></button>}
             </div>
             <div style={S.cardEditorFields}>
-              <RichFieldEditor label="Term" textValue={card.term} onTextChange={v => updateField(card.id, "term", v)} image={card.termImage} onImageChange={v => updateField(card.id, "termImage", v)} table={card.termTable} onTableChange={v => updateField(card.id, "termTable", v)} />
-              <RichFieldEditor label="Definition" textValue={card.definition} onTextChange={v => updateField(card.id, "definition", v)} image={card.defImage} onImageChange={v => updateField(card.id, "defImage", v)} table={card.defTable} onTableChange={v => updateField(card.id, "defTable", v)} />
+              <RichFieldEditor label="Term" textValue={card.term} onTextChange={v => updateField(card.id, "term", v)} image={card.termImage} onImageChange={v => updateField(card.id, "termImage", v)} table={card.termTable} onTableChange={v => updateField(card.id, "termTable", v)} inputRef={getRef(card.id, "term")} onFocusNext={() => getRef(card.id, "def").current?.focus()} onFocusPrev={() => cards[i - 1] && getRef(cards[i - 1].id, "def").current?.focus()} />
+              <RichFieldEditor label="Definition" textValue={card.definition} onTextChange={v => updateField(card.id, "definition", v)} image={card.defImage} onImageChange={v => updateField(card.id, "defImage", v)} table={card.defTable} onTableChange={v => updateField(card.id, "defTable", v)} inputRef={getRef(card.id, "def")} onFocusNext={() => cards[i + 1] && getRef(cards[i + 1].id, "term").current?.focus()} onFocusPrev={() => getRef(card.id, "term").current?.focus()} />
             </div>
           </div>
         ))}
@@ -1456,6 +1477,20 @@ function EditPage({ set, nav, updateSet, S, theme, toggleTheme }) {
   const [title, setTitle] = useState(set?.title || "");
   const [desc, setDesc] = useState(set?.description || "");
   const [cards, setCards] = useState(set?.cards?.map(c => ({ ...newCard(), ...c })) || []);
+  const cardRefs = useRef({});
+  const prevCardCount = useRef(cards.length);
+  const getRef = (cardId, field) => {
+    if (!cardRefs.current[cardId]) cardRefs.current[cardId] = { term: { current: null }, def: { current: null } };
+    return cardRefs.current[cardId][field];
+  };
+
+  useEffect(() => {
+    if (cards.length > prevCardCount.current) {
+      const lastCard = cards[cards.length - 1];
+      getRef(lastCard.id, "term").current?.focus();
+    }
+    prevCardCount.current = cards.length;
+  }, [cards.length]);
 
   if (!set) return null;
 
@@ -1490,8 +1525,8 @@ function EditPage({ set, nav, updateSet, S, theme, toggleTheme }) {
               {cards.length > 1 && <button style={S.iconBtn} onClick={() => removeCard(card.id)}><Icons.Trash /></button>}
             </div>
             <div style={S.cardEditorFields}>
-              <RichFieldEditor label="Term" textValue={card.term} onTextChange={v => updateField(card.id, "term", v)} image={card.termImage} onImageChange={v => updateField(card.id, "termImage", v)} table={card.termTable} onTableChange={v => updateField(card.id, "termTable", v)} />
-              <RichFieldEditor label="Definition" textValue={card.definition} onTextChange={v => updateField(card.id, "definition", v)} image={card.defImage} onImageChange={v => updateField(card.id, "defImage", v)} table={card.defTable} onTableChange={v => updateField(card.id, "defTable", v)} />
+              <RichFieldEditor label="Term" textValue={card.term} onTextChange={v => updateField(card.id, "term", v)} image={card.termImage} onImageChange={v => updateField(card.id, "termImage", v)} table={card.termTable} onTableChange={v => updateField(card.id, "termTable", v)} inputRef={getRef(card.id, "term")} onFocusNext={() => getRef(card.id, "def").current?.focus()} onFocusPrev={() => cards[i - 1] && getRef(cards[i - 1].id, "def").current?.focus()} />
+              <RichFieldEditor label="Definition" textValue={card.definition} onTextChange={v => updateField(card.id, "definition", v)} image={card.defImage} onImageChange={v => updateField(card.id, "defImage", v)} table={card.defTable} onTableChange={v => updateField(card.id, "defTable", v)} inputRef={getRef(card.id, "def")} onFocusNext={() => cards[i + 1] && getRef(cards[i + 1].id, "term").current?.focus()} onFocusPrev={() => getRef(card.id, "term").current?.focus()} />
             </div>
           </div>
         ))}
