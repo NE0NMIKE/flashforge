@@ -314,9 +314,13 @@ function ExpandableImage({ src, style }) {
 }
 
 function renderContent(text, image, table, textStyle, textClass) {
+  const isLong = text && (text.includes("\n") || text.length > 80);
+  const resolvedStyle = isLong
+    ? { whiteSpace: "pre-wrap", ...textStyle, textAlign: "left", width: "100%" }
+    : { whiteSpace: "pre-wrap", ...textStyle };
   return (
     <>
-      {text && <p className={textClass || ""} style={{ whiteSpace: "pre-wrap", ...textStyle }}>{renderLatex(text)}</p>}
+      {text && <p className={textClass || ""} style={resolvedStyle}>{renderLatex(text)}</p>}
       {image && <ExpandableImage src={image} style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 8, marginTop: text ? 10 : 0, objectFit: "contain" }} />}
       {table && <TableDisplay rows={table} />}
     </>
@@ -732,11 +736,12 @@ export default function App() {
 }
 
 // ─── NavBar ───
-function NavBar({ onBack, title, S, theme, toggleTheme }) {
+function NavBar({ onBack, title, S, theme, toggleTheme, showShortcuts }) {
   return (
     <div style={S.navBar}>
       <button style={S.backBtn} onClick={onBack}><Icons.Back /></button>
       <h2 style={S.navTitle}>{title}</h2>
+      {showShortcuts && <ShortcutHelper />}
       <button style={S.themeBtn} onClick={toggleTheme} title="Toggle theme">
         {theme === "dark" ? <Icons.Sun /> : <Icons.Moon />}
       </button>
@@ -1166,16 +1171,18 @@ function ShortcutHelper() {
     { keys: ["∑ Eq"],              desc: "Insert equation ($...$ or $$...$$)" },
   ];
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px 10px" }}>
-      <button type="button" onClick={() => setOpen(o => !o)}
-        style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none",
-          color: t.text3, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }}>
-        <span style={{ fontSize: 14 }}>⌨</span>
-        {open ? "Hide shortcuts" : "Show shortcuts"}
+    <div style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOpen(o => !o)} title="Keyboard shortcuts"
+        style={{ display: "flex", alignItems: "center", justifyContent: "center",
+          width: 36, height: 36, borderRadius: 8, border: `1px solid ${t.border}`,
+          background: open ? t.bg3 : t.bg2, color: t.text2, cursor: "pointer", fontSize: 16 }}>
+        ⌨
       </button>
       {open && (
-        <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-          gap: "6px 16px", background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: "12px 16px" }}>
+        <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 200,
+          width: 520, background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10,
+          padding: "12px 16px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+          gap: "6px 16px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
           {shortcuts.map(({ keys, desc }) => (
             <div key={desc} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
@@ -1248,7 +1255,7 @@ function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
 
   return (
     <div style={S.page} onKeyDown={handlePageKey}>
-      <NavBar onBack={backTarget} title="Create New Set" S={S} theme={theme} toggleTheme={toggleTheme} />
+      <NavBar onBack={backTarget} title="Create New Set" S={S} theme={theme} toggleTheme={toggleTheme} showShortcuts />
       {draftRestored && (
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "8px 24px 0" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, padding: "8px 14px", fontSize: 13, color: "#818CF8" }}>
@@ -1266,7 +1273,6 @@ function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
         <input style={S.input} placeholder="Set title (e.g. Biology Chapter 5)" value={title} onChange={e => setTitle(e.target.value)} />
         <input style={S.input} placeholder="Description (optional)" value={desc} onChange={e => setDesc(e.target.value)} />
       </div>
-      <ShortcutHelper />
       <div style={S.cardList}>
         {cards.map((card, i) => (
           <div key={card.id} style={S.cardEditor} onKeyDown={e => { if (e.ctrlKey && e.key === "Delete") removeCard(card.id); }}>
@@ -1497,12 +1503,11 @@ function EditPage({ set, nav, updateSet, S, theme, toggleTheme }) {
 
   return (
     <div style={S.page} onKeyDown={handlePageKey}>
-      <NavBar onBack={() => nav("detail", { setId: set.id })} title="Edit Set" S={S} theme={theme} toggleTheme={toggleTheme} />
+      <NavBar onBack={() => nav("detail", { setId: set.id })} title="Edit Set" S={S} theme={theme} toggleTheme={toggleTheme} showShortcuts />
       <div style={S.formSection}>
         <input style={S.input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" />
         <input style={S.input} value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description" />
       </div>
-      <ShortcutHelper />
       <div style={S.cardList}>
         {cards.map((card, i) => (
           <div key={card.id} style={S.cardEditor} onKeyDown={e => { if (e.ctrlKey && e.key === "Delete") removeCard(card.id); }}>
