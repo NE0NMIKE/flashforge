@@ -275,52 +275,20 @@ function TableEditor({ rows, onChange }) {
 }
 
 function ExpandableImage({ src, style }) {
-  const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  useEffect(() => {
-    if (!expanded) return;
-    const onKey = (e) => { if (e.key === "Escape") setExpanded(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [expanded]);
-
   return (
-    <>
-      <img
-        src={src} alt=""
-        style={{
-          ...style,
-          cursor: "zoom-in",
-          transition: "transform 0.2s ease, box-shadow 0.2s ease",
-          transform: hovered ? "scale(1.5)" : "scale(1)",
-          boxShadow: hovered ? "0 16px 48px rgba(0,0,0,0.5)" : "none",
-        }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onClick={() => setExpanded(true)}
-      />
-      {expanded && (
-        <div
-          onClick={() => setExpanded(false)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 9999,
-            background: "rgba(0,0,0,0.88)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "zoom-out",
-          }}
-        >
-          <img
-            src={src} alt=""
-            style={{
-              maxWidth: "90vw", maxHeight: "90vh",
-              borderRadius: 12, objectFit: "contain",
-              animation: "imgExpand 0.22s cubic-bezier(0.22,1,0.36,1)",
-            }}
-          />
-        </div>
-      )}
-    </>
+    <img
+      src={src} alt=""
+      style={{
+        ...style,
+        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+        transform: hovered ? "scale(2.2)" : "scale(1)",
+        boxShadow: hovered ? "0 16px 48px rgba(0,0,0,0.5)" : "none",
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    />
   );
 }
 
