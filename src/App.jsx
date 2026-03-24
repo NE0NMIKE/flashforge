@@ -631,7 +631,7 @@ function makeStyles(t) {
     studyMeta: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
     flashcardOuter: { width: "100%", aspectRatio: "16/9", maxHeight: 420, minHeight: 200, marginBottom: 20 },
     flashcardInner: { position: "relative", width: "100%", height: "100%", transformStyle: "preserve-3d" },
-    flashcardFace: { position: "absolute", width: "100%", height: "100%", backfaceVisibility: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 28, borderRadius: 16, background: t.cardBg, border: `1px solid ${t.border2}`, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", overflow: "auto" },
+    flashcardFace: { position: "absolute", width: "100%", height: "100%", backfaceVisibility: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", padding: 28, borderRadius: 16, background: t.cardBg, border: `1px solid ${t.border2}`, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", overflow: "auto" },
     flashcardBack: { transform: "rotateY(180deg)", background: t.cardBack, borderColor: t.cardBackBorder },
     faceLabel: { fontSize: 11, fontWeight: 700, color: "#6366F1", letterSpacing: 2, textTransform: "uppercase", marginBottom: 12, fontFamily: "'Space Mono', monospace", flexShrink: 0 },
     faceText: { fontSize: 22, fontWeight: 600, color: t.text, textAlign: "center", lineHeight: 1.4 },
@@ -1057,13 +1057,17 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, S, t, theme, t
         <div style={S.flashcardOuter} onClick={() => setFlipped(f => !f)} className="flashcard-outer">
           <div style={{ ...S.flashcardInner, transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }} className="flashcard-inner">
             <div style={S.flashcardFace}>
-              <span style={S.faceLabel}>TERM</span>
-              {renderContent(currentCard?.term, currentCard?.termImage, currentCard?.termTable, S.faceText, "face-text")}
-              <span style={S.tapHint}>tap to flip</span>
+              <div style={{ margin: "auto 0", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <span style={S.faceLabel}>TERM</span>
+                {renderContent(currentCard?.term, currentCard?.termImage, currentCard?.termTable, S.faceText, "face-text")}
+                <span style={S.tapHint}>tap to flip</span>
+              </div>
             </div>
             <div style={{ ...S.flashcardFace, ...S.flashcardBack }}>
-              <span style={{ ...S.faceLabel, color: "#818CF8" }}>DEFINITION</span>
-              {renderContent(currentCard?.definition, currentCard?.defImage, currentCard?.defTable, S.faceText, "face-text")}
+              <div style={{ margin: "auto 0", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <span style={{ ...S.faceLabel, color: "#818CF8" }}>DEFINITION</span>
+                {renderContent(currentCard?.definition, currentCard?.defImage, currentCard?.defTable, S.faceText, "face-text")}
+              </div>
             </div>
           </div>
         </div>
