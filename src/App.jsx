@@ -244,6 +244,14 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
   const [urlInput, setUrlInput] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
+  const textareaRef = useRef();
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [textValue]);
 
   const handleImageData = (file) => {
     if (!file || !file.type.startsWith("image/")) return;
@@ -294,7 +302,7 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
   return (
     <div style={{ flex: 1, minWidth: 200 }}>
       <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>{label}</label>
-      <textarea style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "vertical", minHeight: 60 }}
+      <textarea ref={textareaRef} style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "none", minHeight: 60, overflow: "hidden" }}
         value={textValue} onChange={e => onTextChange(e.target.value)} onPaste={handlePaste}
         placeholder={`Enter ${label.toLowerCase()} — or paste an image with Ctrl+V`} rows={2} />
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
