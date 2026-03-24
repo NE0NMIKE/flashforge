@@ -284,6 +284,66 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     if (file) handleImageData(file);
   };
 
+  const handleBullet = () => {
+    const el = textareaRef.current;
+    const { selectionStart: ss, selectionEnd: se } = el;
+    const val = textValue;
+    const lineStart = val.lastIndexOf("\n", ss - 1) + 1;
+    const lineEnd = val.indexOf("\n", se);
+    const block = val.slice(lineStart, lineEnd === -1 ? val.length : lineEnd);
+    const allBulleted = block.split("\n").every(l => l.startsWith("• "));
+    const newBlock = allBulleted
+      ? block.replace(/^• /gm, "")
+      : block.replace(/^/gm, "• ");
+    const newVal = val.slice(0, lineStart) + newBlock + val.slice(lineEnd === -1 ? val.length : lineEnd);
+    onTextChange(newVal);
+    requestAnimationFrame(() => el.focus());
+  };
+
+  const handleKeyDown = (e) => {
+    const el = e.target;
+    const { selectionStart: ss, selectionEnd: se } = el;
+    const val = textValue;
+
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const lineStart = val.lastIndexOf("\n", ss - 1) + 1;
+      const lineEnd = val.indexOf("\n", se);
+      const block = val.slice(lineStart, lineEnd === -1 ? val.length : lineEnd);
+      const newBlock = e.shiftKey
+        ? block.replace(/^  /gm, "")
+        : block.replace(/^/gm, "  ");
+      const delta = newBlock.length - block.length;
+      const newVal = val.slice(0, lineStart) + newBlock + val.slice(lineEnd === -1 ? val.length : lineEnd);
+      onTextChange(newVal);
+      requestAnimationFrame(() => {
+        el.selectionStart = Math.max(lineStart, ss + (e.shiftKey ? Math.max(delta, lineStart - ss) : 2));
+        el.selectionEnd = se + delta;
+      });
+    }
+
+    if (e.key === "Enter") {
+      const lineStart = val.lastIndexOf("\n", ss - 1) + 1;
+      const currentLine = val.slice(lineStart, ss);
+      const bulletMatch = currentLine.match(/^(\s*• )/);
+      if (bulletMatch) {
+        e.preventDefault();
+        if (currentLine.trim() === "•") {
+          const newVal = val.slice(0, lineStart) + val.slice(ss);
+          onTextChange(newVal);
+          requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = lineStart; });
+        } else {
+          const insert = "\n" + bulletMatch[1];
+          const newVal = val.slice(0, ss) + insert + val.slice(ss);
+          onTextChange(newVal);
+          requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = ss + insert.length; });
+        }
+      }
+    }
+
+    if (e.ctrlKey && e.key === "b") { e.preventDefault(); handleBullet(); }
+  };
+
   const toggleImage = () => {
     if (showImage) { onImageChange(null); setShowImage(false); } else setShowImage(true);
   };
@@ -304,9 +364,10 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     <div style={{ flex: 1, minWidth: 200 }}>
       <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>{label}</label>
       <textarea ref={textareaRef} style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "none", minHeight: 60, overflow: "hidden" }}
-        value={textValue} onChange={e => onTextChange(e.target.value)} onPaste={handlePaste}
+        value={textValue} onChange={e => onTextChange(e.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown}
         placeholder={`Enter ${label.toLowerCase()} — or paste an image with Ctrl+V`} rows={2} />
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        <button style={toolbarBtn(false)} onClick={handleBullet} type="button">• List</button>
         <button style={toolbarBtn(showImage)} onClick={toggleImage} type="button"><Icons.Image /> Image</button>
         <button style={toolbarBtn(showTable)} onClick={toggleTable} type="button"><Icons.Table /> Table</button>
       </div>
@@ -961,11 +1022,64 @@ function FolderStudyPage({ folder, folderSets, nav, updateSet, S, t, theme, togg
   );
 }
 
+// ─── Shortcut Helper ───
+function ShortcutHelper() {
+  const t = useContext(ThemeCtx);
+  const [open, setOpen] = useState(false);
+  const shortcuts = [
+    { keys: ["Ctrl", "Enter"],      desc: "Save set" },
+    { keys: ["Ctrl", "⇧", "Enter"], desc: "Add new card" },
+    { keys: ["Ctrl", "Delete"],     desc: "Delete focused card" },
+    { keys: ["Ctrl", "B"],          desc: "Toggle bullet list" },
+    { keys: ["Tab"],                desc: "Indent line" },
+    { keys: ["⇧", "Tab"],          desc: "Dedent line" },
+    { keys: ["Enter"],              desc: "Continue bullet on next line" },
+    { keys: ["Ctrl", "V"],          desc: "Paste image from clipboard" },
+  ];
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px 10px" }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none",
+          color: t.text3, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }}>
+        <span style={{ fontSize: 14 }}>⌨</span>
+        {open ? "Hide shortcuts" : "Show shortcuts"}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+          gap: "6px 16px", background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: "12px 16px" }}>
+          {shortcuts.map(({ keys, desc }) => (
+            <div key={desc} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                {keys.map(k => (
+                  <kbd key={k} style={{ background: t.bg3, border: `1px solid ${t.border2}`, borderRadius: 4,
+                    padding: "1px 6px", fontSize: 11, fontFamily: "'Space Mono', monospace", color: t.text2, whiteSpace: "nowrap" }}>
+                    {k}
+                  </kbd>
+                ))}
+              </div>
+              <span style={{ color: t.text2, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>{desc}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Create Page ───
 function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
-  const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
-  const [cards, setCards] = useState([newCard(), newCard(), newCard()]);
+  const DRAFT_KEY = "flashforge-draft-create";
+  const draft = useMemo(() => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)) || null; } catch { return null; } }, []);
+  const hasDraft = !!(draft && (draft.title || draft.cards?.some(c => c.term || c.definition)));
+
+  const [title, setTitle] = useState(draft?.title || "");
+  const [desc, setDesc] = useState(draft?.desc || "");
+  const [cards, setCards] = useState(draft?.cards?.length ? draft.cards.map(c => ({ ...newCard(), ...c })) : [newCard(), newCard(), newCard()]);
+  const [draftRestored, setDraftRestored] = useState(hasDraft);
+
+  useEffect(() => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, desc, cards }));
+  }, [title, desc, cards]);
 
   const folder = folders.find(f => f.id === folderId);
   const updateField = (id, field, val) => setCards(c => c.map(x => x.id === id ? { ...x, [field]: val } : x));
@@ -977,15 +1091,29 @@ function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
     if (!title.trim() || validCards.length === 0) return;
     const id = uid();
     addSet({ id, title: title.trim(), description: desc.trim(), createdAt: Date.now(), cards: validCards, folderId: folderId || null });
+    localStorage.removeItem(DRAFT_KEY);
     if (folderId) nav("folder", { folderId });
     else nav("detail", { setId: id });
   };
 
   const backTarget = folderId ? () => nav("folder", { folderId }) : () => nav("home");
 
+  const handlePageKey = (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === "Enter") { e.preventDefault(); addCardRow(); }
+    else if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); handleSave(); }
+  };
+
   return (
-    <div style={S.page}>
+    <div style={S.page} onKeyDown={handlePageKey}>
       <NavBar onBack={backTarget} title="Create New Set" S={S} theme={theme} toggleTheme={toggleTheme} />
+      {draftRestored && (
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "8px 24px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, padding: "8px 14px", fontSize: 13, color: "#818CF8" }}>
+            <span>Draft restored — your unsaved progress was recovered.</span>
+            <button onClick={() => setDraftRestored(false)} style={{ background: "none", border: "none", color: "#818CF8", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "0 2px" }}>×</button>
+          </div>
+        </div>
+      )}
       <div style={S.formSection}>
         {folder && (
           <div style={S.folderBreadcrumb}>
@@ -995,9 +1123,10 @@ function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
         <input style={S.input} placeholder="Set title (e.g. Biology Chapter 5)" value={title} onChange={e => setTitle(e.target.value)} />
         <input style={S.input} placeholder="Description (optional)" value={desc} onChange={e => setDesc(e.target.value)} />
       </div>
+      <ShortcutHelper />
       <div style={S.cardList}>
         {cards.map((card, i) => (
-          <div key={card.id} style={S.cardEditor}>
+          <div key={card.id} style={S.cardEditor} onKeyDown={e => { if (e.ctrlKey && e.key === "Delete") removeCard(card.id); }}>
             <div style={S.cardEditorHeader}>
               <span style={S.cardNum}>{i + 1}</span>
               {cards.length > 1 && <button style={S.iconBtn} onClick={() => removeCard(card.id)}><Icons.Trash /></button>}
@@ -1204,16 +1333,22 @@ function EditPage({ set, nav, updateSet, S, theme, toggleTheme }) {
     nav("detail", { setId: set.id });
   };
 
+  const handlePageKey = (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === "Enter") { e.preventDefault(); addCardRow(); }
+    else if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); handleSave(); }
+  };
+
   return (
-    <div style={S.page}>
+    <div style={S.page} onKeyDown={handlePageKey}>
       <NavBar onBack={() => nav("detail", { setId: set.id })} title="Edit Set" S={S} theme={theme} toggleTheme={toggleTheme} />
       <div style={S.formSection}>
         <input style={S.input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" />
         <input style={S.input} value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description" />
       </div>
+      <ShortcutHelper />
       <div style={S.cardList}>
         {cards.map((card, i) => (
-          <div key={card.id} style={S.cardEditor}>
+          <div key={card.id} style={S.cardEditor} onKeyDown={e => { if (e.ctrlKey && e.key === "Delete") removeCard(card.id); }}>
             <div style={S.cardEditorHeader}>
               <span style={S.cardNum}>{i + 1}</span>
               {cards.length > 1 && <button style={S.iconBtn} onClick={() => removeCard(card.id)}><Icons.Trash /></button>}
