@@ -431,11 +431,8 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     const { selectionStart: ss, selectionEnd: se } = el;
     const val = textValue;
 
-    if (e.ctrlKey && e.key === "Tab") {
-      e.preventDefault();
-      if (e.altKey) { onFocusPrev?.(); } else { onFocusNext?.(); }
-      return;
-    }
+    if (e.ctrlKey && e.key === "m") { e.preventDefault(); onFocusNext?.(); return; }
+    if (e.ctrlKey && e.key === "n") { e.preventDefault(); onFocusPrev?.(); return; }
 
     if (e.key === "Tab") {
       e.preventDefault();
