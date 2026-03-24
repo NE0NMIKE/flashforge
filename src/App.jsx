@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from "react";
+import katex from "katex";
 
 // ─── Theme ───
 const ThemeCtx = createContext({});
@@ -124,6 +125,52 @@ const foldersStorage = {
 // ─── Utilities ───
 const uid = () => Math.random().toString(36).slice(2, 10);
 const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
+
+function renderInlineMarkup(str, keyPrefix) {
+  const parts = [];
+  const re = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+  let last = 0, m, idx = 0;
+  while ((m = re.exec(str)) !== null) {
+    if (m.index > last) parts.push(<span key={`${keyPrefix}t${idx++}`}>{str.slice(last, m.index)}</span>);
+    if (m[0].startsWith("**")) parts.push(<strong key={`${keyPrefix}b${idx++}`}>{m[2]}</strong>);
+    else parts.push(<em key={`${keyPrefix}i${idx++}`}>{m[3]}</em>);
+    last = m.index + m[0].length;
+  }
+  if (last < str.length) parts.push(<span key={`${keyPrefix}t${idx++}`}>{str.slice(last)}</span>);
+  return parts;
+}
+
+function renderLatex(text) {
+  if (!text) return null;
+  const segments = [];
+  const blockRe = /\$\$([\s\S]+?)\$\$/g;
+  let last = 0, m;
+  while ((m = blockRe.exec(text)) !== null) {
+    if (m.index > last) segments.push({ type: "text", val: text.slice(last, m.index) });
+    segments.push({ type: "block", val: m[1] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segments.push({ type: "text", val: text.slice(last) });
+
+  return segments.flatMap((seg, i) => {
+    if (seg.type === "block") {
+      try {
+        return [<span key={i} dangerouslySetInnerHTML={{ __html: katex.renderToString(seg.val, { displayMode: true, throwOnError: false }) }} />];
+      } catch { return [<span key={i} style={{ color: "#EF4444" }}>{`$$${seg.val}$$`}</span>]; }
+    }
+    const inlineRe = /\$([^\n$]+?)\$/g;
+    const out = []; let li = 0, im;
+    while ((im = inlineRe.exec(seg.val)) !== null) {
+      if (im.index > li) out.push(...renderInlineMarkup(seg.val.slice(li, im.index), `${i}t${li}`));
+      try {
+        out.push(<span key={`${i}m${im.index}`} dangerouslySetInnerHTML={{ __html: katex.renderToString(im[1], { throwOnError: false }) }} />);
+      } catch { out.push(<span key={`${i}e${im.index}`} style={{ color: "#EF4444" }}>{`$${im[1]}$`}</span>); }
+      li = im.index + im[0].length;
+    }
+    if (li < seg.val.length) out.push(...renderInlineMarkup(seg.val.slice(li), `${i}t${li}`));
+    return out;
+  });
+}
 const newCard = () => ({
   id: uid(), term: "", definition: "", starred: false, bucket: 0,
   interval: 0, easeFactor: 2.5, repetitions: 0, nextReview: 0,
@@ -227,11 +274,61 @@ function TableEditor({ rows, onChange }) {
   );
 }
 
+function ExpandableImage({ src, style }) {
+  const [expanded, setExpanded] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e) => { if (e.key === "Escape") setExpanded(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded]);
+
+  return (
+    <>
+      <img
+        src={src} alt=""
+        style={{
+          ...style,
+          cursor: "zoom-in",
+          transition: "transform 0.2s ease, box-shadow 0.2s ease",
+          transform: hovered ? "scale(1.5)" : "scale(1)",
+          boxShadow: hovered ? "0 16px 48px rgba(0,0,0,0.5)" : "none",
+        }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onClick={() => setExpanded(true)}
+      />
+      {expanded && (
+        <div
+          onClick={() => setExpanded(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.88)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "zoom-out",
+          }}
+        >
+          <img
+            src={src} alt=""
+            style={{
+              maxWidth: "90vw", maxHeight: "90vh",
+              borderRadius: 12, objectFit: "contain",
+              animation: "imgExpand 0.22s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
 function renderContent(text, image, table, textStyle, textClass) {
   return (
     <>
-      {text && <p className={textClass || ""} style={textStyle}>{text}</p>}
-      {image && <img src={image} alt="" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 8, marginTop: text ? 10 : 0, objectFit: "contain" }} />}
+      {text && <p className={textClass || ""} style={{ whiteSpace: "pre-wrap", ...textStyle }}>{renderLatex(text)}</p>}
+      {image && <ExpandableImage src={image} style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 8, marginTop: text ? 10 : 0, objectFit: "contain" }} />}
       {table && <TableDisplay rows={table} />}
     </>
   );
@@ -300,6 +397,34 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     requestAnimationFrame(() => el.focus());
   };
 
+  const wrapSelection = (before, after) => {
+    const el = textareaRef.current;
+    const { selectionStart: ss, selectionEnd: se } = el;
+    const selected = textValue.slice(ss, se);
+    const insert = `${before}${selected}${after}`;
+    const newVal = textValue.slice(0, ss) + insert + textValue.slice(se);
+    onTextChange(newVal);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.selectionStart = selected ? ss : ss + before.length;
+      el.selectionEnd = selected ? ss + insert.length : ss + before.length;
+    });
+  };
+
+  const handleBold     = () => wrapSelection("**", "**");
+  const handleItalic   = () => wrapSelection("*", "*");
+
+  const handleEquation = () => {
+    const el = textareaRef.current;
+    const { selectionStart: ss, selectionEnd: se } = el;
+    const selected = textValue.slice(ss, se);
+    const insert = selected ? `$${selected}$` : `$$\n\n$$`;
+    const cursor = selected ? ss + insert.length : ss + 3;
+    const newVal = textValue.slice(0, ss) + insert + textValue.slice(se);
+    onTextChange(newVal);
+    requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = cursor; });
+  };
+
   const handleKeyDown = (e) => {
     const el = e.target;
     const { selectionStart: ss, selectionEnd: se } = el;
@@ -341,7 +466,9 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
       }
     }
 
-    if (e.ctrlKey && e.key === "b") { e.preventDefault(); handleBullet(); }
+    if (e.ctrlKey && e.key === "b") { e.preventDefault(); handleBold(); }
+    if (e.ctrlKey && e.key === "i") { e.preventDefault(); handleItalic(); }
+    if (e.ctrlKey && e.key === "l") { e.preventDefault(); handleBullet(); }
   };
 
   const toggleImage = () => {
@@ -367,7 +494,10 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
         value={textValue} onChange={e => onTextChange(e.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown}
         placeholder={`Enter ${label.toLowerCase()} — or paste an image with Ctrl+V`} rows={2} />
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-        <button style={toolbarBtn(false)} onClick={handleBullet} type="button">• List</button>
+        <button style={toolbarBtn(false)} onClick={handleBold}     type="button"><b>B</b></button>
+        <button style={toolbarBtn(false)} onClick={handleItalic}   type="button"><i>I</i></button>
+        <button style={toolbarBtn(false)} onClick={handleBullet}   type="button">• List</button>
+        <button style={toolbarBtn(false)} onClick={handleEquation} type="button">∑ Eq</button>
         <button style={toolbarBtn(showImage)} onClick={toggleImage} type="button"><Icons.Image /> Image</button>
         <button style={toolbarBtn(showTable)} onClick={toggleTable} type="button"><Icons.Table /> Table</button>
       </div>
@@ -524,6 +654,7 @@ const globalCSS = (t) => `
   .flashcard-inner { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes imgExpand { from { opacity: 0; transform: scale(0.88); } to { opacity: 1; transform: scale(1); } }
   input::placeholder, textarea::placeholder { color: ${t.text4}; }
   input:focus, textarea:focus { outline: none; border-color: #6366F1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
   select:focus { outline: none; border-color: #6366F1 !important; }
@@ -642,7 +773,9 @@ function SetCard({ set, S, nav, folderName }) {
 // ─── Home Page ───
 function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
   const [search, setSearch] = useState("");
-  const ungrouped = sets.filter(s => !s.folderId);
+  const byTitle = (a, b) => a.title.localeCompare(b.title);
+  const ungrouped = sets.filter(s => !s.folderId).sort(byTitle);
+  const sortedFolders = [...folders].sort((a, b) => a.name.localeCompare(b.name));
   const hasContent = folders.length > 0 || ungrouped.length > 0;
   const query = search.trim().toLowerCase();
   const searchResults = query
@@ -652,7 +785,7 @@ function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
           c.term.toLowerCase().includes(query) ||
           c.definition.toLowerCase().includes(query)
         )
-      )
+      ).sort(byTitle)
     : [];
 
   const handleNewFolder = () => {
@@ -721,7 +854,7 @@ function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
             <>
               <div style={S.sectionLabel}>Folders</div>
               <div style={S.setGrid}>
-                {folders.map(folder => {
+                {sortedFolders.map(folder => {
                   const folderSets = sets.filter(s => s.folderId === folder.id);
                   const totalCards = folderSets.reduce((a, s) => a + s.cards.length, 0);
                   const dueCount = folderSets.flatMap(s => s.cards).filter(isDue).length;
@@ -761,7 +894,7 @@ function FolderPage({ folder, sets, nav, S, t, theme, toggleTheme, deleteFolder,
 
   if (!folder) return <div style={S.page}><NavBar onBack={() => nav("home")} title="Not Found" S={S} theme={theme} toggleTheme={toggleTheme} /></div>;
 
-  const folderSets = sets.filter(s => s.folderId === folder.id);
+  const folderSets = sets.filter(s => s.folderId === folder.id).sort((a, b) => a.title.localeCompare(b.title));
   const totalCards = folderSets.reduce((a, s) => a + s.cards.length, 0);
   const dueCount = folderSets.flatMap(s => s.cards).filter(isDue).length;
 
@@ -1030,11 +1163,14 @@ function ShortcutHelper() {
     { keys: ["Ctrl", "Enter"],      desc: "Save set" },
     { keys: ["Ctrl", "⇧", "Enter"], desc: "Add new card" },
     { keys: ["Ctrl", "Delete"],     desc: "Delete focused card" },
-    { keys: ["Ctrl", "B"],          desc: "Toggle bullet list" },
+    { keys: ["Ctrl", "B"],          desc: "Bold selected text" },
+    { keys: ["Ctrl", "I"],          desc: "Italic selected text" },
+    { keys: ["Ctrl", "L"],          desc: "Toggle bullet list" },
     { keys: ["Tab"],                desc: "Indent line" },
     { keys: ["⇧", "Tab"],          desc: "Dedent line" },
     { keys: ["Enter"],              desc: "Continue bullet on next line" },
     { keys: ["Ctrl", "V"],          desc: "Paste image from clipboard" },
+    { keys: ["∑ Eq"],              desc: "Insert equation ($...$ or $$...$$)" },
   ];
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px 10px" }}>
