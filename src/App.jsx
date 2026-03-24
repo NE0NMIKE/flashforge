@@ -276,17 +276,38 @@ function TableEditor({ rows, onChange }) {
 
 function ExpandableImage({ src, style }) {
   const [hovered, setHovered] = useState(false);
+  const [origin, setOrigin] = useState("center center");
+  const imgRef = useRef();
+
+  const handleMouseEnter = () => {
+    const img = imgRef.current;
+    if (img) {
+      const card = img.closest(".flashcard-outer");
+      if (card) {
+        const ir = img.getBoundingClientRect();
+        const cr = card.getBoundingClientRect();
+        const ox = ((cr.left + cr.width  / 2) - ir.left) / ir.width  * 100;
+        const oy = ((cr.top  + cr.height / 2) - ir.top)  / ir.height * 100;
+        setOrigin(`${ox}% ${oy}%`);
+      } else {
+        setOrigin("center center");
+      }
+    }
+    setHovered(true);
+  };
 
   return (
     <img
+      ref={imgRef}
       src={src} alt=""
       style={{
         ...style,
         transition: "transform 0.2s ease, box-shadow 0.2s ease",
         transform: hovered ? "scale(2.2)" : "scale(1)",
+        transformOrigin: origin,
         boxShadow: hovered ? "0 16px 48px rgba(0,0,0,0.5)" : "none",
       }}
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
     />
   );
