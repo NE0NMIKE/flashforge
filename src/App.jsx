@@ -1038,7 +1038,7 @@ function SetCard({ set, S, nav, folderName }) {
 // ─── Home Page ───
 function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
   const [search, setSearch] = useState("");
-  const byTitle = (a, b) => a.title.localeCompare(b.title);
+  const byTitle = (a, b) => a.title.localeCompare(b.title, undefined, { numeric: true });
   const ungrouped = sets.filter(s => !s.folderId).sort(byTitle);
   const sortedFolders = [...folders].sort((a, b) => a.name.localeCompare(b.name));
   const hasContent = folders.length > 0 || ungrouped.length > 0;
@@ -1159,7 +1159,7 @@ function FolderPage({ folder, sets, nav, S, t, theme, toggleTheme, deleteFolder,
 
   if (!folder) return <div style={S.page}><NavBar onBack={() => nav("home")} title="Not Found" S={S} theme={theme} toggleTheme={toggleTheme} /></div>;
 
-  const folderSets = sets.filter(s => s.folderId === folder.id).sort((a, b) => a.title.localeCompare(b.title));
+  const folderSets = sets.filter(s => s.folderId === folder.id).sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }));
   const totalCards = folderSets.reduce((a, s) => a + s.cards.length, 0);
   const dueCount = folderSets.flatMap(s => s.cards).filter(isDue).length;
 
