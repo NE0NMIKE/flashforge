@@ -1,6 +1,23 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from "react";
 import katex from "katex";
 
+// ─── LaTeX Scan ───
+const LATEX_SCAN_PROMPT = `You are a LaTeX equation extractor. The user will send you an image containing mathematical equations, expressions, or formulas.
+
+Your job:
+1. Extract ALL mathematical content from the image
+2. Convert it to clean, correct LaTeX code
+3. Return ONLY the LaTeX — no explanation, no markdown, no backticks, no preamble
+
+Rules:
+- Use display math for standalone equations: \\[ ... \\]
+- Use inline math for inline expressions: $ ... $
+- If there are multiple equations, separate them with newlines
+- If it's a system of equations, use the \\begin{cases} or \\begin{align} environments as appropriate
+- Preserve all subscripts, superscripts, fractions, integrals, summations, Greek letters, etc.
+- If you cannot read part of the equation, use a comment: % unreadable
+- Output nothing but LaTeX`;
+
 // ─── Theme ───
 const ThemeCtx = createContext({});
 
@@ -327,12 +344,171 @@ function renderContent(text, image, table, textStyle, textClass) {
   );
 }
 
+// ─── LaTeX Scan Modal ───
+function LatexScanModal({ onClose, onInsert }) {
+  const t = useContext(ThemeCtx);
+  const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef();
+
+  const processFile = (file) => {
+    if (!file || !file.type.startsWith("image/")) { setError("Please upload an image file."); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      setImage({ dataUrl, base64: dataUrl.split(",")[1], mimeType: file.type });
+      setResult(""); setError("");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePaste = useCallback((e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const imgItem = items.find(i => i.kind === "file" && i.type.startsWith("image/"));
+    if (imgItem) { e.preventDefault(); processFile(imgItem.getAsFile()); }
+  }, []);
+
+  const convert = async () => {
+    const apiKey = localStorage.getItem("flashforge-anthropic-key");
+    if (!apiKey) { setError("No API key set. Click the 🔑 button in the top bar to add your Anthropic key."); return; }
+    if (!image) return;
+    setLoading(true); setError(""); setResult("");
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1024,
+          system: LATEX_SCAN_PROMPT,
+          messages: [{ role: "user", content: [
+            { type: "image", source: { type: "base64", media_type: image.mimeType, data: image.base64 } },
+            { type: "text", text: "Extract the LaTeX from this image." },
+          ]}],
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      const text = data.content?.find(b => b.type === "text")?.text?.trim() || "";
+      setResult(text);
+    } catch (err) {
+      setError(err.message || "Conversion failed. Check your API key and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 500,
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+      onPaste={handlePaste}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 16,
+        padding: 24, width: "100%", maxWidth: 500, display: "flex", flexDirection: "column", gap: 14,
+        boxShadow: "0 24px 64px rgba(0,0,0,0.4)" }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ color: t.text, fontSize: 15, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", margin: 0 }}>
+            Scan Equation → LaTeX
+          </h3>
+          <button type="button" onClick={onClose}
+            style={{ background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 2 }}>✕</button>
+        </div>
+
+        {/* Drop zone */}
+        <div
+          className={`drop-zone${dragOver ? " drag-over" : ""}`}
+          style={{ minHeight: 140, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, background: t.bg3, borderRadius: 10, cursor: "pointer" }}
+          onClick={() => fileRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); processFile(e.dataTransfer.files[0]); }}
+        >
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
+            onChange={(e) => processFile(e.target.files[0])} />
+          {image ? (
+            <img src={image.dataUrl} alt="" style={{ maxHeight: 120, maxWidth: "100%", borderRadius: 8, objectFit: "contain" }} />
+          ) : (
+            <div style={{ textAlign: "center", userSelect: "none" }}>
+              <p style={{ color: t.text3, fontSize: 13, marginBottom: 4 }}>Drop image or click to browse</p>
+              <p style={{ color: t.text4, fontSize: 11, fontFamily: "'Space Mono', monospace" }}>Ctrl+V to paste from clipboard</p>
+            </div>
+          )}
+        </div>
+
+        {/* Error */}
+        {error && (
+          <p style={{ color: "#F87171", fontSize: 12, background: "rgba(239,68,68,0.08)",
+            border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "8px 12px", margin: 0 }}>
+            {error}
+          </p>
+        )}
+
+        {/* Result textarea */}
+        {result && (
+          <textarea
+            style={{ background: t.inputBg2, border: `1px solid #6366F1`, borderRadius: 8,
+              padding: "10px 12px", color: "#A5B4FC", fontSize: 12, fontFamily: "'Space Mono', monospace",
+              resize: "vertical", minHeight: 80, width: "100%", lineHeight: 1.7 }}
+            value={result}
+            onChange={(e) => setResult(e.target.value)}
+            spellCheck={false}
+          />
+        )}
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button"
+            style={{ flex: 1, background: "linear-gradient(135deg, #6366F1, #4F46E5)", color: "#fff",
+              border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 14, fontWeight: 600,
+              cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+              opacity: (!image || loading) ? 0.45 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            onClick={convert} disabled={!image || loading}
+          >
+            {loading && <span style={{ width: 13, height: 13, border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />}
+            {loading ? "Converting..." : "Convert"}
+          </button>
+          {result && (
+            <button type="button"
+              style={{ flex: 1, background: "rgba(99,102,241,0.15)", color: "#818CF8",
+                border: "1px solid #6366F1", borderRadius: 10, padding: "10px 16px",
+                fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+              onClick={() => onInsert(result)}
+            >
+              Insert
+            </button>
+          )}
+          <button type="button"
+            style={{ background: t.bg3, color: t.text2, border: `1px solid ${t.border}`,
+              borderRadius: 10, padding: "10px 16px", fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange, table, onTableChange, inputRef, onFocusNext, onFocusPrev }) {
   const t = useContext(ThemeCtx);
   const [showImage, setShowImage] = useState(!!image);
   const [showTable, setShowTable] = useState(!!table);
   const [urlInput, setUrlInput] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
   const fileRef = useRef();
   const textareaRef = useRef();
   const setTextareaRef = (el) => { textareaRef.current = el; if (inputRef) inputRef.current = el; };
@@ -486,6 +662,17 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     if (e.ctrlKey && e.key === "l") { e.preventDefault(); handleBullet(); }
   };
 
+  const handleScanInsert = (latexText) => {
+    const el = textareaRef.current;
+    const ss = el?.selectionStart ?? textValue.length;
+    const se = el?.selectionEnd ?? textValue.length;
+    const wrapped = `$$\n${latexText}\n$$`;
+    const newVal = textValue.slice(0, ss) + wrapped + textValue.slice(se);
+    commitChange(newVal);
+    setShowScanModal(false);
+    requestAnimationFrame(() => el?.focus());
+  };
+
   const toggleImage = () => {
     if (showImage) { onImageChange(null); setShowImage(false); } else setShowImage(true);
   };
@@ -513,6 +700,7 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
         <button style={toolbarBtn(false)} onClick={handleItalic}   type="button"><i>I</i></button>
         <button style={toolbarBtn(false)} onClick={handleBullet}   type="button">• List</button>
         <button style={toolbarBtn(false)} onClick={handleEquation} type="button">∑ Eq</button>
+        <button style={toolbarBtn(false)} onClick={() => setShowScanModal(true)} type="button">📷 Scan</button>
         <button style={toolbarBtn(showImage)} onClick={toggleImage} type="button"><Icons.Image /> Image</button>
         <button style={toolbarBtn(showTable)} onClick={toggleTable} type="button"><Icons.Table /> Table</button>
       </div>
@@ -546,6 +734,7 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
         </div>
       )}
       {showTable && table && <div style={{ marginTop: 8 }}><TableEditor rows={table} onChange={onTableChange} /></div>}
+      {showScanModal && <LatexScanModal onClose={() => setShowScanModal(false)} onInsert={handleScanInsert} />}
     </div>
   );
 }
@@ -753,6 +942,64 @@ export default function App() {
   );
 }
 
+// ─── API Key Button ───
+function ApiKeyButton() {
+  const t = useContext(ThemeCtx);
+  const [open, setOpen] = useState(false);
+  const [key, setKey] = useState(() => localStorage.getItem("flashforge-anthropic-key") || "");
+  const hasKey = !!localStorage.getItem("flashforge-anthropic-key");
+
+  const save = () => {
+    if (key.trim()) localStorage.setItem("flashforge-anthropic-key", key.trim());
+    else localStorage.removeItem("flashforge-anthropic-key");
+    setOpen(false);
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOpen(o => !o)} title={hasKey ? "API key configured" : "Set Anthropic API key"}
+        style={{ display: "flex", alignItems: "center", justifyContent: "center",
+          width: 36, height: 36, borderRadius: 8, border: `1px solid ${hasKey ? "rgba(99,102,241,0.4)" : t.border}`,
+          background: open ? t.bg3 : t.bg2, color: hasKey ? "#818CF8" : t.text3, cursor: "pointer", fontSize: 15 }}>
+        🔑
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 200,
+          width: 300, background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10,
+          padding: "14px 16px", boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+          display: "flex", flexDirection: "column", gap: 10 }}>
+          <div>
+            <p style={{ color: t.text, fontSize: 13, fontWeight: 600, marginBottom: 2, fontFamily: "'DM Sans', sans-serif" }}>Anthropic API Key</p>
+            <p style={{ color: t.text4, fontSize: 11, fontFamily: "'DM Sans', sans-serif" }}>Required for the 📷 Scan equation feature. Stored locally in your browser only.</p>
+          </div>
+          <input
+            type="password"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && save()}
+            placeholder="sk-ant-..."
+            style={{ background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8,
+              padding: "8px 10px", color: t.text, fontSize: 12, fontFamily: "'Space Mono', monospace", width: "100%" }}
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" onClick={save}
+              style={{ flex: 1, background: "linear-gradient(135deg, #6366F1, #4F46E5)", color: "#fff",
+                border: "none", borderRadius: 8, padding: "7px 12px", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              Save
+            </button>
+            <button type="button" onClick={() => setOpen(false)}
+              style={{ background: t.bg3, color: t.text2, border: `1px solid ${t.border}`,
+                borderRadius: 8, padding: "7px 12px", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── NavBar ───
 function NavBar({ onBack, title, S, theme, toggleTheme, showShortcuts }) {
   return (
@@ -760,6 +1007,7 @@ function NavBar({ onBack, title, S, theme, toggleTheme, showShortcuts }) {
       <button style={S.backBtn} onClick={onBack}><Icons.Back /></button>
       <h2 style={S.navTitle}>{title}</h2>
       {showShortcuts && <ShortcutHelper />}
+      <ApiKeyButton />
       <button style={S.themeBtn} onClick={toggleTheme} title="Toggle theme">
         {theme === "dark" ? <Icons.Sun /> : <Icons.Moon />}
       </button>
