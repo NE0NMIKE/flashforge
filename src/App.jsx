@@ -546,9 +546,8 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
 
   const handlePaste = (e) => {
     const items = Array.from(e.clipboardData?.items || []);
-    const hasText = items.some(item => item.kind === "string" && (item.type === "text/plain" || item.type === "text/html"));
     const imgItem = items.find(item => item.kind === "file" && item.type.startsWith("image/"));
-    if (imgItem && !hasText) {
+    if (imgItem) {
       e.preventDefault();
       setShowImage(true);
       handleImageData(imgItem.getAsFile());
