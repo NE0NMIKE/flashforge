@@ -1513,7 +1513,8 @@ function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
   };
 
   useEffect(() => {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, desc, cards }));
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, desc, cards })); }
+    catch { /* quota exceeded — draft not saved, but app stays alive */ }
   }, [title, desc, cards]);
 
   useEffect(() => {
