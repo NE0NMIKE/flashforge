@@ -946,7 +946,7 @@ export default function App() {
         {view.page === "detail"      && <DetailPage set={currentSet} folders={folders} updateSet={updateSet} deleteSet={deleteSet} moveSetToFolder={moveSetToFolder} {...sharedProps} />}
         {view.page === "study"       && <StudyPage  set={currentSet} updateSet={updateSet} starredOnly={!!view.starredOnly} {...sharedProps} />}
         {view.page === "test"        && <TestPage   set={currentSet} {...sharedProps} />}
-        {view.page === "edit"        && <EditPage   set={currentSet} updateSet={updateSet} focusCardId={view.focusCardId} {...sharedProps} />}
+        {view.page === "edit"        && <EditPage   set={currentSet} updateSet={updateSet} focusCardId={view.focusCardId} returnView={view.returnView} {...sharedProps} />}
       </div>
     </ThemeCtx.Provider>
   );
@@ -1395,7 +1395,7 @@ function StudyPage({ set, nav, updateSet, starredOnly, S, t, theme, toggleTheme 
       dueCount={studyCards.filter(isDue).length}
       onBack={() => nav("detail", { setId: set.id })}
       onRate={onRate}
-      onEdit={cardId => nav("edit", { setId: set.id, focusCardId: cardId })}
+      onEdit={cardId => nav("edit", { setId: set.id, focusCardId: cardId, returnView: { page: "study", setId: set.id, starredOnly: starredOnly || false } })}
       S={S} t={t} theme={theme} toggleTheme={toggleTheme}
     />
   );
@@ -1438,7 +1438,7 @@ function FolderStudyPage({ folder, folderSets, nav, updateSet, S, t, theme, togg
       dueCount={dueCount}
       onBack={() => nav("folder", { folderId: folder.id })}
       onRate={onRate}
-      onEdit={cardId => { const sid = cardSetMap[cardId]; if (sid) nav("edit", { setId: sid, focusCardId: cardId }); }}
+      onEdit={cardId => { const sid = cardSetMap[cardId]; if (sid) nav("edit", { setId: sid, focusCardId: cardId, returnView: { page: "folderStudy", folderId: folder.id } }); }}
       S={S} t={t} theme={theme} toggleTheme={toggleTheme}
     />
   );
@@ -1759,7 +1759,7 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
 }
 
 // ─── Edit Page ───
-function EditPage({ set, nav, updateSet, focusCardId, S, theme, toggleTheme }) {
+function EditPage({ set, nav, updateSet, focusCardId, returnView, S, theme, toggleTheme }) {
   const [title, setTitle] = useState(set?.title || "");
   const [desc, setDesc] = useState(set?.description || "");
   const [cards, setCards] = useState(set?.cards?.map(c => ({ ...newCard(), ...c })) || []);
@@ -1794,7 +1794,7 @@ function EditPage({ set, nav, updateSet, focusCardId, S, theme, toggleTheme }) {
   const handleSave = () => {
     const valid = cards.filter(c => c.term.trim() || c.termImage || c.termTable);
     updateSet(set.id, st => ({ ...st, title: title.trim() || st.title, description: desc.trim(), cards: valid }));
-    nav("detail", { setId: set.id });
+    nav(returnView?.page || "detail", returnView || { setId: set.id });
   };
 
   const handlePageKey = (e) => {
@@ -1804,7 +1804,7 @@ function EditPage({ set, nav, updateSet, focusCardId, S, theme, toggleTheme }) {
 
   return (
     <div style={S.page} onKeyDown={handlePageKey}>
-      <NavBar onBack={() => nav("detail", { setId: set.id })} title="Edit Set" S={S} theme={theme} toggleTheme={toggleTheme} showShortcuts />
+      <NavBar onBack={() => nav(returnView?.page || "detail", returnView || { setId: set.id })} title="Edit Set" S={S} theme={theme} toggleTheme={toggleTheme} showShortcuts />
       <div style={S.formSection}>
         <input style={S.input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" />
         <input style={S.input} value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description" />
