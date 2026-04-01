@@ -307,11 +307,17 @@ function ExpandableImage({ src, style }) {
         const ox = ((cr.left + cr.width  / 2) - ir.left) / ir.width  * 100;
         const oy = ((cr.top  + cr.height / 2) - ir.top)  / ir.height * 100;
         setOrigin(`${ox}% ${oy}%`);
+        card.classList.add("img-hovered");
       } else {
         setOrigin("center center");
       }
     }
     setHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    imgRef.current?.closest(".flashcard-outer")?.classList.remove("img-hovered");
+    setHovered(false);
   };
 
   return (
@@ -324,9 +330,11 @@ function ExpandableImage({ src, style }) {
         transform: hovered ? "scale(2.2)" : "scale(1)",
         transformOrigin: origin,
         boxShadow: hovered ? "0 16px 48px rgba(0,0,0,0.5)" : "none",
+        position: "relative",
+        zIndex: hovered ? 10 : "auto",
       }}
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={handleMouseLeave}
     />
   );
 }
@@ -857,6 +865,7 @@ const globalCSS = (t) => `
   .set-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,0,0,0.2); border-color: ${t.border2} !important; }
   .flashcard-outer { perspective: 1200px; cursor: pointer; }
   .flashcard-inner { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
+  .flashcard-outer.img-hovered .flashcard-face { overflow: visible !important; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes imgExpand { from { opacity: 0; transform: scale(0.88); } to { opacity: 1; transform: scale(1); } }
@@ -937,7 +946,7 @@ export default function App() {
         {view.page === "detail"      && <DetailPage set={currentSet} folders={folders} updateSet={updateSet} deleteSet={deleteSet} moveSetToFolder={moveSetToFolder} {...sharedProps} />}
         {view.page === "study"       && <StudyPage  set={currentSet} updateSet={updateSet} starredOnly={!!view.starredOnly} {...sharedProps} />}
         {view.page === "test"        && <TestPage   set={currentSet} {...sharedProps} />}
-        {view.page === "edit"        && <EditPage   set={currentSet} updateSet={updateSet} {...sharedProps} />}
+        {view.page === "edit"        && <EditPage   set={currentSet} updateSet={updateSet} focusCardId={view.focusCardId} {...sharedProps} />}
       </div>
     </ThemeCtx.Provider>
   );
@@ -1231,7 +1240,7 @@ function FolderPage({ folder, sets, nav, S, t, theme, toggleTheme, deleteFolder,
 }
 
 // ─── Study Core (shared between StudyPage and FolderStudyPage) ───
-function StudyCore({ studyCards, title, dueCount, onBack, onRate, S, t, theme, toggleTheme }) {
+function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, theme, toggleTheme }) {
   const [cardOrder, setCardOrder] = useState(() => studyCards.map((_, i) => i));
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -1303,16 +1312,25 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, S, t, theme, t
           </button>
         </div>
 
-        <div style={S.flashcardOuter} onClick={() => setFlipped(f => !f)} className="flashcard-outer">
+        <div style={{ ...S.flashcardOuter, position: "relative" }} onClick={() => setFlipped(f => !f)} className="flashcard-outer">
+          {onEdit && (
+            <button
+              onClick={e => { e.stopPropagation(); onEdit(currentCard.id); }}
+              style={{ position: "absolute", top: 10, right: 10, zIndex: 2, background: "rgba(0,0,0,0.35)", border: "none", borderRadius: 7, padding: "6px 8px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}
+              title="Edit this card"
+            >
+              <Icons.Edit /> Edit
+            </button>
+          )}
           <div style={{ ...S.flashcardInner, transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }} className="flashcard-inner">
-            <div style={S.flashcardFace}>
+            <div style={S.flashcardFace} className="flashcard-face">
               <div style={{ margin: "auto 0", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <span style={S.faceLabel}>TERM</span>
                 {renderContent(currentCard?.term, currentCard?.termImage, currentCard?.termTable, S.faceText, "face-text")}
                 <span style={S.tapHint}>tap to flip</span>
               </div>
             </div>
-            <div style={{ ...S.flashcardFace, ...S.flashcardBack }}>
+            <div style={{ ...S.flashcardFace, ...S.flashcardBack }} className="flashcard-face">
               <div style={{ margin: "auto 0", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <span style={{ ...S.faceLabel, color: "#818CF8" }}>DEFINITION</span>
                 {renderContent(currentCard?.definition, currentCard?.defImage, currentCard?.defTable, S.faceText, "face-text")}
@@ -1377,6 +1395,7 @@ function StudyPage({ set, nav, updateSet, starredOnly, S, t, theme, toggleTheme 
       dueCount={studyCards.filter(isDue).length}
       onBack={() => nav("detail", { setId: set.id })}
       onRate={onRate}
+      onEdit={cardId => nav("edit", { setId: set.id, focusCardId: cardId })}
       S={S} t={t} theme={theme} toggleTheme={toggleTheme}
     />
   );
@@ -1419,6 +1438,7 @@ function FolderStudyPage({ folder, folderSets, nav, updateSet, S, t, theme, togg
       dueCount={dueCount}
       onBack={() => nav("folder", { folderId: folder.id })}
       onRate={onRate}
+      onEdit={cardId => { const sid = cardSetMap[cardId]; if (sid) nav("edit", { setId: sid, focusCardId: cardId }); }}
       S={S} t={t} theme={theme} toggleTheme={toggleTheme}
     />
   );
@@ -1739,7 +1759,7 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
 }
 
 // ─── Edit Page ───
-function EditPage({ set, nav, updateSet, S, theme, toggleTheme }) {
+function EditPage({ set, nav, updateSet, focusCardId, S, theme, toggleTheme }) {
   const [title, setTitle] = useState(set?.title || "");
   const [desc, setDesc] = useState(set?.description || "");
   const [cards, setCards] = useState(set?.cards?.map(c => ({ ...newCard(), ...c })) || []);
@@ -1749,6 +1769,13 @@ function EditPage({ set, nav, updateSet, S, theme, toggleTheme }) {
     if (!cardRefs.current[cardId]) cardRefs.current[cardId] = { term: { current: null }, def: { current: null } };
     return cardRefs.current[cardId][field];
   };
+
+  useEffect(() => {
+    if (focusCardId) {
+      const el = getRef(focusCardId, "term").current;
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
+    }
+  }, []);
 
   useEffect(() => {
     if (cards.length > prevCardCount.current) {
