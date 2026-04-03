@@ -590,20 +590,8 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
       el.selectionEnd = selected ? ss + insert.length : ss + before.length;
     });
   };
-
-  const handleBold     = () => wrapSelection("**", "**");
-  const handleItalic   = () => wrapSelection("*", "*");
-
-  const handleEquation = () => {
-    const el = textareaRef.current;
-    const { selectionStart: ss, selectionEnd: se } = el;
-    const selected = textValue.slice(ss, se);
-    const insert = selected ? `$${selected}$` : `$$\n\n$$`;
-    const cursor = selected ? ss + insert.length : ss + 3;
-    const newVal = textValue.slice(0, ss) + insert + textValue.slice(se);
-    commitChange(newVal);
-    requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = cursor; });
-  };
+  const handleBold   = () => wrapSelection("**", "**");
+  const handleItalic = () => wrapSelection("*", "*");
 
   const handleKeyDown = (e) => {
     const el = e.target;
@@ -700,14 +688,11 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
   return (
     <div style={{ flex: 1, minWidth: 200 }}>
       <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.text3, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace" }}>{label}</label>
-      <textarea ref={setTextareaRef} style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", resize: "none", minHeight: 60, overflow: "hidden" }}
+      <textarea ref={setTextareaRef} style={{ width: "100%", background: t.inputBg2, border: `1px solid ${t.border}`, borderRadius: 8, padding: "10px 12px", color: t.text, fontSize: 16, fontFamily: "'DM Sans', sans-serif", resize: "none", minHeight: 60, overflow: "hidden" }}
         value={textValue} onChange={e => commitChange(e.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown}
         placeholder={`Enter ${label.toLowerCase()} — or paste an image with Ctrl+V`} rows={2} />
-      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-        <button style={toolbarBtn(false)} onClick={handleBold}     type="button"><b>B</b></button>
-        <button style={toolbarBtn(false)} onClick={handleItalic}   type="button"><i>I</i></button>
+      <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
         <button style={toolbarBtn(false)} onClick={handleBullet}   type="button">• List</button>
-        <button style={toolbarBtn(false)} onClick={handleEquation} type="button">∑ Eq</button>
         <button style={toolbarBtn(false)} onClick={() => setShowScanModal(true)} type="button">📷 Scan</button>
         <button style={toolbarBtn(showImage)} onClick={toggleImage} type="button"><Icons.Image /> Image</button>
         <button style={toolbarBtn(showTable)} onClick={toggleTable} type="button"><Icons.Table /> Table</button>
@@ -795,7 +780,7 @@ function makeStyles(t) {
 
     // Forms
     formSection: { padding: "20px 24px 0", maxWidth: 900, margin: "0 auto" },
-    input: { width: "100%", background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 10, padding: "12px 14px", color: t.text, fontSize: 14, marginBottom: 12, fontFamily: "'DM Sans', sans-serif" },
+    input: { width: "100%", background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 10, padding: "12px 14px", color: t.text, fontSize: 16, marginBottom: 12, fontFamily: "'DM Sans', sans-serif" },
     textarea: { width: "100%", background: t.inputBg, border: `1px solid ${t.border}`, borderRadius: 10, padding: "12px 14px", color: t.text, fontSize: 14, fontFamily: "'Space Mono', monospace", resize: "vertical", lineHeight: 1.6 },
     cardList: { padding: "12px 24px", maxWidth: 900, margin: "0 auto" },
     cardEditor: { background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 12, padding: 14, marginBottom: 10 },
@@ -877,8 +862,20 @@ const globalCSS = (t) => `
   ::-webkit-scrollbar-thumb { background: ${t.scrollbar}; border-radius: 3px; }
   body { transition: background-color 0.25s; }
   .face-text { font-size: 22px; }
+  .primary-btn:hover { filter: brightness(1.12); }
+  .secondary-btn:hover { border-color: ${t.border2} !important; background: ${t.bg3} !important; }
+  .mode-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
   @media (min-width: 768px) { .face-text { font-size: 26px; } }
-  @media (max-width: 640px) { .flashcard-outer { min-height: 200px; } }
+  @media (max-width: 640px) {
+    .flashcard-outer { min-height: 160px !important; aspect-ratio: unset !important; height: 220px; }
+    .flashcard-face { padding: 16px !important; }
+    .study-controls-wrap { gap: 4px !important; }
+    .rating-btn { padding: 6px 8px !important; font-size: 12px !important; }
+    .mode-grid { grid-template-columns: 1fr 1fr !important; }
+    .card-editor-fields { flex-direction: column !important; }
+    .options-grid { grid-template-columns: 1fr !important; }
+    .study-container { padding: 12px 12px !important; }
+  }
 `;
 
 // ─── Main App ───
@@ -1092,7 +1089,7 @@ function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
       </header>
 
       <div style={S.actionBar}>
-        <button style={S.primaryBtn} onClick={() => nav("create")}><Icons.Plus /> New Set</button>
+        <button style={S.primaryBtn} className="primary-btn" onClick={() => nav("create")}><Icons.Plus /> New Set</button>
         <button style={S.secondaryBtn} onClick={handleNewFolder}><Icons.FolderPlus /> New Folder</button>
         <button style={S.secondaryBtn} onClick={() => nav("import")}><Icons.Import /> Import</button>
       </div>
@@ -1296,10 +1293,21 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, 
     return () => window.removeEventListener("keydown", handleKey);
   }, [handleKey]);
 
+  const touchStart = useRef(null);
+  const handleTouchStart = (e) => { touchStart.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    if (touchStart.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStart.current;
+    touchStart.current = null;
+    if (Math.abs(dx) < 40) return; // short tap — let onClick handle flip
+    e.preventDefault();
+    if (dx < 0) go(1); else go(-1);
+  };
+
   return (
     <div style={S.page}>
       <NavBar onBack={onBack} title={title} S={S} theme={theme} toggleTheme={toggleTheme} />
-      <div style={S.studyContainer}>
+      <div style={S.studyContainer} className="study-container">
         <div style={S.progressWrap}><div style={{ ...S.progressBar, width: `${progress}%` }} /></div>
         <div style={S.studyMeta}>
           <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: t.text3 }}>
@@ -1311,7 +1319,7 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, 
           </button>
         </div>
 
-        <div style={{ ...S.flashcardOuter, position: "relative" }} onClick={() => setFlipped(f => !f)} className="flashcard-outer">
+        <div style={{ ...S.flashcardOuter, position: "relative", touchAction: "pan-y" }} onClick={() => setFlipped(f => !f)} className="flashcard-outer" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {onEdit && (
             <button
               onClick={e => { e.stopPropagation(); onEdit(currentCard.id); }}
@@ -1344,14 +1352,14 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, 
           </div>
         ) : (
           <>
-            <div style={S.studyControls}>
+            <div style={S.studyControls} className="study-controls-wrap">
               <button style={S.navArrow} onClick={() => go(-1)}><Icons.ChevLeft /></button>
               {flipped ? (
                 <>
-                  <button style={S.againBtn} onClick={() => handleRate(0)}>Again <span style={S.keyHint}>1</span><span style={S.ratingHint}>{intervalLabel(currentCard, 0)}</span></button>
-                  <button style={S.hardBtn}  onClick={() => handleRate(1)}>Hard <span style={S.keyHint}>2</span><span style={S.ratingHint}>{intervalLabel(currentCard, 1)}</span></button>
-                  <button style={S.goodBtn}  onClick={() => handleRate(2)}>Good <span style={S.keyHint}>3</span><span style={S.ratingHint}>{intervalLabel(currentCard, 2)}</span></button>
-                  <button style={S.easyBtn}  onClick={() => handleRate(3)}>Easy <span style={S.keyHint}>4</span><span style={S.ratingHint}>{intervalLabel(currentCard, 3)}</span></button>
+                  <button style={S.againBtn} className="rating-btn" onClick={() => handleRate(0)}>Again <span style={S.keyHint}>1</span><span style={S.ratingHint}>{intervalLabel(currentCard, 0)}</span></button>
+                  <button style={S.hardBtn}  className="rating-btn" onClick={() => handleRate(1)}>Hard <span style={S.keyHint}>2</span><span style={S.ratingHint}>{intervalLabel(currentCard, 1)}</span></button>
+                  <button style={S.goodBtn}  className="rating-btn" onClick={() => handleRate(2)}>Good <span style={S.keyHint}>3</span><span style={S.ratingHint}>{intervalLabel(currentCard, 2)}</span></button>
+                  <button style={S.easyBtn}  className="rating-btn" onClick={() => handleRate(3)}>Easy <span style={S.keyHint}>4</span><span style={S.ratingHint}>{intervalLabel(currentCard, 3)}</span></button>
                 </>
               ) : (
                 <span style={{ color: t.text3, fontSize: 13, padding: "10px 20px" }}>Flip to rate</span>
@@ -1461,7 +1469,6 @@ function ShortcutHelper() {
     { keys: ["Ctrl", "N"],          desc: "Dedent line" },
     { keys: ["Enter"],              desc: "Continue bullet on next line" },
     { keys: ["Ctrl", "V"],          desc: "Paste image from clipboard" },
-    { keys: ["∑ Eq"],              desc: "Insert equation ($...$ or $$...$$)" },
   ];
   return (
     <div style={{ position: "relative" }}>
@@ -1473,8 +1480,8 @@ function ShortcutHelper() {
       </button>
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 200,
-          width: 520, background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10,
-          padding: "12px 16px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+          width: "min(480px, calc(100vw - 24px))", background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10,
+          padding: "12px 16px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
           gap: "6px 16px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
           {shortcuts.map(({ keys, desc }) => (
             <div key={desc} style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1574,7 +1581,7 @@ function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
               <span style={S.cardNum}>{i + 1}</span>
               {cards.length > 1 && <button style={S.iconBtn} onClick={() => removeCard(card.id)}><Icons.Trash /></button>}
             </div>
-            <div style={S.cardEditorFields}>
+            <div style={S.cardEditorFields} className="card-editor-fields">
               <RichFieldEditor label="Term" textValue={card.term} onTextChange={v => updateField(card.id, "term", v)} image={card.termImage} onImageChange={v => updateField(card.id, "termImage", v)} table={card.termTable} onTableChange={v => updateField(card.id, "termTable", v)} inputRef={getRef(card.id, "term")} onFocusNext={() => getRef(card.id, "def").current?.focus()} onFocusPrev={() => cards[i - 1] && getRef(cards[i - 1].id, "def").current?.focus()} />
               <RichFieldEditor label="Definition" textValue={card.definition} onTextChange={v => updateField(card.id, "definition", v)} image={card.defImage} onImageChange={v => updateField(card.id, "defImage", v)} table={card.defTable} onTableChange={v => updateField(card.id, "defTable", v)} inputRef={getRef(card.id, "def")} onFocusNext={() => cards[i + 1] && getRef(cards[i + 1].id, "term").current?.focus()} onFocusPrev={() => getRef(card.id, "term").current?.focus()} />
             </div>
@@ -1689,24 +1696,24 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
             </div>
           );
         })()}
-        <div style={{ ...S.modeGrid, gridTemplateColumns: starredCount > 0 ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr" }}>
-          <button style={S.modeBtn} onClick={() => nav("study", { setId: set.id })} disabled={set.cards.length === 0}>
+        <div style={{ ...S.modeGrid, gridTemplateColumns: starredCount > 0 ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr" }} className="mode-grid">
+          <button style={S.modeBtn} className="mode-btn" onClick={() => nav("study", { setId: set.id })} disabled={set.cards.length === 0}>
             <Icons.Cards /><span>Flashcards</span>
             {dueCount > 0 && <span style={S.dueBadge}>{dueCount}</span>}
           </button>
           {starredCount > 0 && (
-            <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #92400E, #B45309)" }} onClick={() => nav("study", { setId: set.id, starredOnly: true })}>
+            <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #92400E, #B45309)" }} className="mode-btn" onClick={() => nav("study", { setId: set.id, starredOnly: true })}>
               <Icons.Star filled /><span>Starred</span>
               <span style={S.dueBadge}>{starredCount}</span>
             </button>
           )}
           <div style={{ position: "relative" }} title={set.cards.length < 4 ? "Need ≥ 4 cards to test" : ""}>
-            <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #065F46, #047857)", width: "100%", opacity: set.cards.length < 4 ? 0.5 : 1 }} onClick={() => nav("test", { setId: set.id })} disabled={set.cards.length < 4}>
+            <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #065F46, #047857)", width: "100%", opacity: set.cards.length < 4 ? 0.5 : 1 }} className="mode-btn" onClick={() => nav("test", { setId: set.id })} disabled={set.cards.length < 4}>
               <Icons.Test /><span>Test</span>
               {set.cards.length < 4 && <span style={{ fontSize: 9, opacity: 0.8, fontFamily: "'Space Mono', monospace", marginTop: -4 }}>need ≥ 4 cards</span>}
             </button>
           </div>
-          <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #7C3AED, #6D28D9)" }} onClick={() => nav("edit", { setId: set.id })}>
+          <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #7C3AED, #6D28D9)" }} className="mode-btn" onClick={() => nav("edit", { setId: set.id })}>
             <Icons.Edit /><span>Edit</span>
           </button>
         </div>
@@ -1816,7 +1823,7 @@ function EditPage({ set, nav, updateSet, focusCardId, returnView, S, theme, togg
               <span style={S.cardNum}>{i + 1}</span>
               {cards.length > 1 && <button style={S.iconBtn} onClick={() => removeCard(card.id)}><Icons.Trash /></button>}
             </div>
-            <div style={S.cardEditorFields}>
+            <div style={S.cardEditorFields} className="card-editor-fields">
               <RichFieldEditor label="Term" textValue={card.term} onTextChange={v => updateField(card.id, "term", v)} image={card.termImage} onImageChange={v => updateField(card.id, "termImage", v)} table={card.termTable} onTableChange={v => updateField(card.id, "termTable", v)} inputRef={getRef(card.id, "term")} onFocusNext={() => getRef(card.id, "def").current?.focus()} onFocusPrev={() => cards[i - 1] && getRef(cards[i - 1].id, "def").current?.focus()} />
               <RichFieldEditor label="Definition" textValue={card.definition} onTextChange={v => updateField(card.id, "definition", v)} image={card.defImage} onImageChange={v => updateField(card.id, "defImage", v)} table={card.defTable} onTableChange={v => updateField(card.id, "defTable", v)} inputRef={getRef(card.id, "def")} onFocusNext={() => cards[i + 1] && getRef(cards[i + 1].id, "term").current?.focus()} onFocusPrev={() => getRef(card.id, "term").current?.focus()} />
             </div>
@@ -1887,7 +1894,7 @@ function TestPage({ set, nav, S, t, theme, toggleTheme }) {
               <p style={S.questionTerm}>{q.term}</p>
               {q.termImage && <img src={q.termImage} alt="" style={{ maxHeight: 120, maxWidth: "100%", borderRadius: 8, marginBottom: 12, objectFit: "contain" }} />}
               {q.type === "mc" ? (
-                <div style={S.optionsGrid}>
+                <div style={S.optionsGrid} className="options-grid">
                   {q.options.map(opt => (
                     <button key={opt} style={{ ...S.optionBtn, ...(answers[q.id] === opt ? S.optionSelected : {}) }} onClick={() => setAnswers(a => ({ ...a, [q.id]: opt }))}>
                       {opt}
