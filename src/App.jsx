@@ -2372,6 +2372,31 @@ function EditPage({ set, nav, updateSet, focusCardId, returnView, S, theme, togg
     return cardRefs.current[cardId][field];
   };
 
+  // Refs so the beforeunload handler always sees the latest values without a stale closure
+  const titleRef = useRef(title);
+  const descRef = useRef(desc);
+  const cardsRef = useRef(cards);
+  useEffect(() => { titleRef.current = title; }, [title]);
+  useEffect(() => { descRef.current = desc; }, [desc]);
+  useEffect(() => { cardsRef.current = cards; }, [cards]);
+
+  // Auto-save edits synchronously when the user refreshes or closes the tab,
+  // so changes are never lost before the user hits the Save button.
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const valid = cardsRef.current.filter(c => c.term.trim() || c.termImage || c.termTable);
+      const savedSets = storage.load() || [];
+      const updated = savedSets.map(s =>
+        s.id === set.id
+          ? { ...s, title: titleRef.current.trim() || s.title, description: descRef.current.trim(), cards: valid }
+          : s
+      );
+      storage.save(updated);
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
   useEffect(() => {
     if (focusCardId) {
       const el = getRef(focusCardId, "term").current;
