@@ -2077,7 +2077,7 @@ function CreatePage({ addSet, folders, folderId, S, theme, toggleTheme, nav }) {
 
   const handlePageKey = (e) => {
     if (e.ctrlKey && e.shiftKey && e.key === "Enter") { e.preventDefault(); addCardRow(); }
-    else if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); handleSave(); }
+    else if (e.ctrlKey && (e.key === "Enter" || e.key === "s")) { e.preventDefault(); handleSave(); }
   };
 
   return (
@@ -2401,7 +2401,7 @@ function EditPage({ set, nav, updateSet, focusCardId, returnView, S, theme, togg
 
   const handlePageKey = (e) => {
     if (e.ctrlKey && e.shiftKey && e.key === "Enter") { e.preventDefault(); addCardRow(); }
-    else if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); handleSave(); }
+    else if (e.ctrlKey && (e.key === "Enter" || e.key === "s")) { e.preventDefault(); handleSave(); }
   };
 
   return (
