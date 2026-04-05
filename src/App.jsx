@@ -2376,6 +2376,12 @@ function EditPage({ set, nav, updateSet, focusCardId, returnView, S, theme, togg
     if (focusCardId) {
       const el = getRef(focusCardId, "term").current;
       if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
+    } else {
+      const lastCard = cards[cards.length - 1];
+      if (lastCard) {
+        const el = getRef(lastCard.id, "term").current;
+        if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
+      }
     }
   }, []);
 
