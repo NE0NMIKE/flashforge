@@ -122,16 +122,35 @@ const Icons = {
 
 // ─── Storage ───
 const STORAGE_KEY = "flashforge-sets";
+const STORAGE_BACKUP_KEY = "flashforge-sets-backup";
 const FOLDERS_KEY = "flashforge-folders";
 
 const storage = {
   load() {
-    try { const d = localStorage.getItem(STORAGE_KEY); return d ? JSON.parse(d) : null; }
-    catch { return null; }
+    // Try primary key first
+    try {
+      const d = localStorage.getItem(STORAGE_KEY);
+      if (d) {
+        const parsed = JSON.parse(d);
+        if (parsed !== null) return parsed;
+      }
+    } catch { /* primary corrupt, fall through to backup */ }
+    // Silent recovery: use backup if primary is absent or corrupt
+    try {
+      const b = localStorage.getItem(STORAGE_BACKUP_KEY);
+      if (b) return JSON.parse(b);
+    } catch {}
+    return null;
   },
   save(sets) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sets)); }
     catch (e) { console.error("Save failed:", e); }
+    // Backup written one event-loop tick after primary to guard against
+    // the same partial-write fault clobbering both at once.
+    setTimeout(() => {
+      try { localStorage.setItem(STORAGE_BACKUP_KEY, JSON.stringify(sets)); }
+      catch { /* backup write failure is non-fatal */ }
+    }, 0);
   },
 };
 
@@ -1028,7 +1047,14 @@ export default function App() {
       clearTimeout(undoTimerRef.current);
     }
   };
-  const addSet = (set) => setSets(prev => [set, ...prev]);
+  const addSet = (set) => {
+    setSets(prev => {
+      const next = [set, ...prev];
+      storage.save(next);     // synchronous flush — before React paint, before draft removal
+      setsRef.current = next; // keep ref current so beforeunload never writes stale data
+      return next;
+    });
+  };
 
   // Global keyboard shortcuts
   useEffect(() => {
