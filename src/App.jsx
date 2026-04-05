@@ -956,11 +956,43 @@ export default function App() {
   const t = THEMES[theme];
   const S = useMemo(() => makeStyles(t), [theme]);
 
+  // Refs for beforeunload (avoids stale closure)
+  const setsRef = useRef([]);
+  const foldersRef = useRef([]);
+  useEffect(() => { setsRef.current = sets; }, [sets]);
+  useEffect(() => { foldersRef.current = folders; }, [folders]);
+
   useEffect(() => {
     const data = storage.load();
-    setSets(data && data.length > 0 ? data : SAMPLE_SETS);
+    // Only fall back to SAMPLE_SETS when there is genuinely no stored data (null),
+    // not when the user has an empty set list (data === []).
+    setSets(data !== null ? data : SAMPLE_SETS);
     setFolders(foldersStorage.load());
     setLoaded(true);
+
+    // Cross-tab sync: the `storage` event fires in every tab *except* the one
+    // that wrote the value, so each tab stays in sync without clobbering anything.
+    const handleStorage = (e) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try { setSets(JSON.parse(e.newValue)); } catch {}
+      }
+      if (e.key === FOLDERS_KEY && e.newValue) {
+        try { setFolders(JSON.parse(e.newValue)); } catch {}
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+
+    // Final save on close/refresh, in case a React render cycle is mid-flight.
+    const handleBeforeUnload = () => {
+      storage.save(setsRef.current);
+      foldersStorage.save(foldersRef.current);
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, []);
 
   useEffect(() => { if (loaded) storage.save(sets); }, [sets, loaded]);
