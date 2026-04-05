@@ -1561,6 +1561,12 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, 
   const [autoPlaySpeed, setAutoPlaySpeed] = useState(3000);
   const autoPlayTimer = useRef(null);
 
+  // Round-based study — declared before the autoplay effect so they're not in TDZ
+  const ROUND_SIZE = 7;
+  const [currentRound, setCurrentRound] = useState(0);
+  const [showRoundSummary, setShowRoundSummary] = useState(false);
+  const [roundRatings, setRoundRatings] = useState([]);
+
   useEffect(() => {
     if (!autoPlay || sessionComplete || showRoundSummary) return;
     autoPlayTimer.current = setTimeout(() => {
@@ -1575,12 +1581,6 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, 
 
   const toggleAutoPlay = () => setAutoPlay(a => !a);
   const pauseAutoPlay = () => { if (autoPlay) { setAutoPlay(false); clearTimeout(autoPlayTimer.current); } };
-
-  // Round-based study
-  const ROUND_SIZE = 7;
-  const [currentRound, setCurrentRound] = useState(0);
-  const [showRoundSummary, setShowRoundSummary] = useState(false);
-  const [roundRatings, setRoundRatings] = useState([]);
 
   useEffect(() => { if (setId) recentStorage.add(setId); }, [setId]);
 
