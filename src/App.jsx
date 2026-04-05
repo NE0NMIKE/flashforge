@@ -125,6 +125,28 @@ const STORAGE_KEY = "flashforge-sets";
 const STORAGE_BACKUP_KEY = "flashforge-sets-backup";
 const FOLDERS_KEY = "flashforge-folders";
 
+// Returns { usedKB, totalKB, pct } — totalKB is null when the StorageManager API
+// is unavailable (e.g. Firefox private mode).
+async function getStorageUsage() {
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const { usage, quota } = await navigator.storage.estimate();
+      return { usedKB: Math.round(usage / 1024), totalKB: Math.round(quota / 1024), pct: quota ? usage / quota : 0 };
+    }
+  } catch {}
+  // Fallback: measure localStorage string lengths directly (~2 bytes per char)
+  try {
+    let bytes = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      bytes += (k.length + (localStorage.getItem(k) || "").length) * 2;
+    }
+    return { usedKB: Math.round(bytes / 1024), totalKB: 5120, pct: bytes / (5 * 1024 * 1024) };
+  } catch {
+    return { usedKB: 0, totalKB: 5120, pct: 0 };
+  }
+}
+
 const storage = {
   load() {
     // Try primary key first
@@ -142,15 +164,21 @@ const storage = {
     } catch {}
     return null;
   },
+  // Returns true on success, false on quota error
   save(sets) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sets)); }
-    catch (e) { console.error("Save failed:", e); }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sets));
+    } catch (e) {
+      console.error("Save failed:", e);
+      return false;
+    }
     // Backup written one event-loop tick after primary to guard against
     // the same partial-write fault clobbering both at once.
     setTimeout(() => {
       try { localStorage.setItem(STORAGE_BACKUP_KEY, JSON.stringify(sets)); }
       catch { /* backup write failure is non-fatal */ }
     }, 0);
+    return true;
   },
 };
 
@@ -1047,11 +1075,31 @@ export default function App() {
       clearTimeout(undoTimerRef.current);
     }
   };
+  // Storage warning state
+  const [storageWarning, setStorageWarning] = useState(null); // null | "full" | "near"
+  const storageWarnTimerRef = useRef(null);
+  const showStorageWarning = (level) => {
+    setStorageWarning(level);
+    clearTimeout(storageWarnTimerRef.current);
+    storageWarnTimerRef.current = setTimeout(() => setStorageWarning(null), 8000);
+  };
+
+  // Check storage usage and warn if near/over limit
+  const checkStorageUsage = async () => {
+    const { pct } = await getStorageUsage();
+    if (pct >= 0.95) showStorageWarning("full");
+    else if (pct >= 0.8) showStorageWarning("near");
+  };
+
+  useEffect(() => { checkStorageUsage(); }, [loaded]);
+
   const addSet = (set) => {
     setSets(prev => {
       const next = [set, ...prev];
-      storage.save(next);     // synchronous flush — before React paint, before draft removal
-      setsRef.current = next; // keep ref current so beforeunload never writes stale data
+      const ok = storage.save(next);  // synchronous flush — before React paint, before draft removal
+      setsRef.current = next;         // keep ref current so beforeunload never writes stale data
+      if (!ok) showStorageWarning("full");
+      else checkStorageUsage();
       return next;
     });
   };
@@ -1134,6 +1182,22 @@ export default function App() {
         {view.page === "edit"        && <EditPage   set={currentSet} updateSet={updateSet} focusCardId={view.focusCardId} returnView={view.returnView} {...sharedProps} />}
         {view.page === "smartStudy"  && <SmartStudyPage sets={sets} updateSet={updateSet} {...sharedProps} />}
         {view.page === "settings"    && <SettingsPage toggleTheme={toggleTheme} theme={theme} sets={sets} setSets={setSets} setFolders={setFolders} {...sharedProps} />}
+
+        {/* Storage warning toast */}
+        {storageWarning && (
+          <div role="alert" aria-live="assertive" style={{ position: "fixed", bottom: deletedSet ? 80 : 24, left: "50%", transform: "translateX(-50%)", zIndex: 101,
+            background: storageWarning === "full" ? "#7F1D1D" : "#78350F", border: `1px solid ${storageWarning === "full" ? "#EF4444" : "#F59E0B"}`,
+            borderRadius: 12, padding: "12px 20px", display: "flex", alignItems: "center", gap: 14,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.4)", animation: "fadeIn 0.2s ease", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: 16 }}>{storageWarning === "full" ? "⚠️" : "🔶"}</span>
+            <span style={{ color: "#fff", fontSize: 14, fontWeight: 500 }}>
+              {storageWarning === "full"
+                ? "Storage full — new sets may not save. Delete old sets or clear images."
+                : "Storage nearly full (>80%). Consider deleting unused sets."}
+            </span>
+            <button onClick={() => setStorageWarning(null)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
+          </div>
+        )}
 
         {/* Undo delete toast */}
         {deletedSet && (
