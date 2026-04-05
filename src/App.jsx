@@ -112,6 +112,12 @@ const Icons = {
   FolderPlus: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><path d="M12 11v6M9 14h6"/></svg>,
   Download: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>,
   Search: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>,
+  Trophy: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 010-5H6M18 9h1.5a2.5 2.5 0 000-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22h10c0-2-0.85-3.25-2.03-3.79A1.07 1.07 0 0114 17v-2.34"/><path d="M18 2H6v7a6 6 0 1012 0V2z"/></svg>,
+  Play: () => <svg width="18" height="18" fill="currentColor" stroke="none" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>,
+  Pause: () => <svg width="18" height="18" fill="currentColor" stroke="none" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>,
+  Settings: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+  Zap: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
+  Clock: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
 };
 
 // ─── Storage ───
@@ -216,6 +222,21 @@ function computeSM2(card, rating) {
 }
 
 const isDue = (card) => !card.nextReview || card.nextReview <= Date.now();
+
+const getMasteryLevel = (card) => {
+  if (!card.repetitions) return "not-studied";
+  if (card.repetitions <= 2) return "learning";
+  if (card.repetitions > 5 && card.interval >= 21) return "mastered";
+  if (card.interval >= 7) return "familiar";
+  return "learning";
+};
+
+const MASTERY_COLORS = {
+  "not-studied": { bg: "rgba(100,116,139,0.15)", color: "#94A3B8", label: "Not studied" },
+  "learning":    { bg: "rgba(248,113,113,0.15)", color: "#F87171", label: "Learning" },
+  "familiar":    { bg: "rgba(251,191,36,0.15)",  color: "#FBBF24", label: "Familiar" },
+  "mastered":    { bg: "rgba(52,211,153,0.15)",   color: "#34D399", label: "Mastered" },
+};
 
 const intervalLabel = (card, rating) => {
   const { interval } = computeSM2(card, rating);
@@ -840,6 +861,34 @@ function makeStyles(t) {
     scoreNum: { fontSize: 36, fontWeight: 700, color: t.text, fontFamily: "'Space Mono', monospace" },
     scoreLabel: { fontSize: 12, color: t.text2, fontFamily: "'Space Mono', monospace" },
     resultRow: { background: t.bg2, borderRadius: 10, padding: 14, marginBottom: 8 },
+
+    // Mode cards (detail page hub)
+    modeCard: { display: "flex", flexDirection: "column", gap: 6, padding: "20px 16px", borderRadius: 14, border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textAlign: "left", position: "relative", transition: "all 0.2s" },
+    modeCardTitle: { fontSize: 15, fontWeight: 700, color: "#fff" },
+    modeCardDesc: { fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 },
+
+    // Breadcrumbs
+    breadcrumbs: { display: "flex", alignItems: "center", gap: 6, padding: "8px 0", marginBottom: 8, fontSize: 12, fontFamily: "'DM Sans', sans-serif", flexWrap: "wrap" },
+    breadcrumbLink: { color: t.text3, cursor: "pointer", textDecoration: "none", background: "none", border: "none", padding: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 12 },
+    breadcrumbSep: { color: t.text4, fontSize: 11 },
+    breadcrumbCurrent: { color: t.text2, fontWeight: 500, fontSize: 12 },
+
+    // Recently studied
+    recentRow: { display: "flex", gap: 12, overflowX: "auto", padding: "4px 24px 12px", maxWidth: 1200, margin: "0 auto", scrollSnapType: "x mandatory" },
+    recentCard: { flex: "0 0 170px", background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 12, padding: "12px 14px", scrollSnapAlign: "start", cursor: "pointer", textAlign: "left", fontFamily: "'DM Sans', sans-serif" },
+
+    // Session Summary
+    sessionSummary: { animation: "fadeIn 0.4s ease", textAlign: "center" },
+    summaryStats: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 },
+    summaryStatItem: { background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 12, padding: "14px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 },
+    summaryStatNum: { fontSize: 22, fontWeight: 700, color: t.text, fontFamily: "'Space Mono', monospace" },
+    summaryStatLabel: { fontSize: 11, color: t.text3, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 },
+    missedCard: { background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: "10px 14px", marginBottom: 6, textAlign: "left" },
+
+    // Mastery
+    masteryBar: { display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 16, background: t.bg3 },
+    masterySegment: { height: "100%", transition: "width 0.4s ease" },
+    masteryBadge: { display: "inline-flex", alignItems: "center", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, fontFamily: "'Space Mono', monospace", whiteSpace: "nowrap" },
   };
 }
 
@@ -853,6 +902,11 @@ const globalCSS = (t) => `
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes imgExpand { from { opacity: 0; transform: scale(0.88); } to { opacity: 1; transform: scale(1); } }
+  @keyframes confettiFall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+  @keyframes slideOutLeft { to { transform: translateX(-30px); opacity: 0; } }
+  @keyframes slideOutRight { to { transform: translateX(30px); opacity: 0; } }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 0.8; } }
   input::placeholder, textarea::placeholder { color: ${t.text4}; }
   input:focus, textarea:focus { outline: none; border-color: #6366F1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
   select:focus { outline: none; border-color: #6366F1 !important; }
@@ -863,18 +917,31 @@ const globalCSS = (t) => `
   body { transition: background-color 0.25s; }
   .face-text { font-size: 22px; }
   .primary-btn:hover { filter: brightness(1.12); }
+  .primary-btn:active { transform: scale(0.97); }
   .secondary-btn:hover { border-color: ${t.border2} !important; background: ${t.bg3} !important; }
+  .secondary-btn:active { transform: scale(0.97); }
   .mode-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .mode-btn:active { transform: scale(0.95) translateY(0) !important; }
+  .mode-card:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+  .mode-card:active { transform: scale(0.97) translateY(0) !important; }
+  .rating-btn:active { transform: scale(0.93); }
+  .set-card:active { transform: scale(0.98) translateY(0) !important; }
   @media (min-width: 768px) { .face-text { font-size: 26px; } }
   @media (max-width: 640px) {
     .flashcard-outer { min-height: 160px !important; aspect-ratio: unset !important; height: 220px; }
     .flashcard-face { padding: 16px !important; }
     .study-controls-wrap { gap: 4px !important; }
     .rating-btn { padding: 6px 8px !important; font-size: 12px !important; }
-    .mode-grid { grid-template-columns: 1fr 1fr !important; }
+    .mode-grid { grid-template-columns: 1fr !important; }
     .card-editor-fields { flex-direction: column !important; }
     .options-grid { grid-template-columns: 1fr !important; }
     .study-container { padding: 12px 12px !important; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001s !important;
+      transition-duration: 0.001s !important;
+    }
   }
 `;
 
@@ -903,10 +970,49 @@ export default function App() {
   const toggleTheme = () => setTheme(th => th === "dark" ? "light" : "dark");
   const nav = (page, props = {}) => setView({ page, ...props });
 
+  // Undo delete
+  const [deletedSet, setDeletedSet] = useState(null);
+  const undoTimerRef = useRef(null);
+
+  // Search ref for global shortcuts
+  const searchRef = useRef(null);
+
   // Set CRUD
   const updateSet = (id, updater) => setSets(prev => prev.map(x => x.id === id ? updater(x) : x));
-  const deleteSet = (id) => { setSets(prev => prev.filter(x => x.id !== id)); nav("home"); };
+  const deleteSet = (id) => {
+    const setToDelete = sets.find(x => x.id === id);
+    setSets(prev => prev.filter(x => x.id !== id));
+    nav("home");
+    if (setToDelete) {
+      setDeletedSet(setToDelete);
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = setTimeout(() => setDeletedSet(null), 5000);
+    }
+  };
+  const undoDelete = () => {
+    if (deletedSet) {
+      setSets(prev => [deletedSet, ...prev]);
+      setDeletedSet(null);
+      clearTimeout(undoTimerRef.current);
+    }
+  };
   const addSet = (set) => setSets(prev => [set, ...prev]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleGlobalKey = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if ((e.key === "/" || (e.ctrlKey && e.key === "k")) && view.page === "home") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (e.key === "n" || e.key === "N") { e.preventDefault(); nav("create"); }
+      if (e.key === "Escape" && view.page !== "home") nav("home");
+    };
+    window.addEventListener("keydown", handleGlobalKey);
+    return () => window.removeEventListener("keydown", handleGlobalKey);
+  }, [view.page]);
 
   // Folder CRUD
   const addFolder = (folder) => setFolders(prev => [folder, ...prev]);
@@ -918,10 +1024,35 @@ export default function App() {
   const moveSetToFolder = (setId, folderId) => updateSet(setId, s => ({ ...s, folderId: folderId || null }));
 
   if (!loaded) {
+    const skeletonBar = (w, h = 14) => ({ width: w, height: h, borderRadius: 6, background: t.bg3, animation: "pulse 1.5s ease infinite" });
     return (
-      <div style={S.loadingWrap}>
-        <div style={S.spinner} />
-        <p style={{ color: t.text2, marginTop: 16, fontFamily: "'DM Sans', sans-serif" }}>Loading your sets...</p>
+      <div style={S.app}>
+        <style>{globalCSS(t)}</style>
+        <header style={S.header}>
+          <div style={S.headerInner}>
+            <div>
+              <div style={skeletonBar("160px", 28)} />
+              <div style={{ ...skeletonBar("200px", 14), marginTop: 8 }} />
+            </div>
+            <div style={skeletonBar("36px", 36)} />
+          </div>
+          <div style={{ ...skeletonBar("100%", 44), marginTop: 16 }} />
+        </header>
+        <div style={S.actionBar}>
+          <div style={skeletonBar("100px", 40)} />
+          <div style={skeletonBar("120px", 40)} />
+          <div style={skeletonBar("90px", 40)} />
+        </div>
+        <div style={S.setGrid}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} style={{ ...S.setCard, cursor: "default" }}>
+              <div style={{ ...skeletonBar("60px", 12), marginBottom: 12 }} />
+              <div style={skeletonBar("80%", 16)} />
+              <div style={{ ...skeletonBar("60%", 12), marginTop: 8 }} />
+              <div style={{ ...skeletonBar("40%", 11), marginTop: "auto", paddingTop: 12 }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -934,7 +1065,7 @@ export default function App() {
     <ThemeCtx.Provider value={t}>
       <div style={S.app}>
         <style>{globalCSS(t)}</style>
-        {view.page === "home"        && <HomePage sets={sets} folders={folders} addFolder={addFolder} {...sharedProps} />}
+        {view.page === "home"        && <HomePage sets={sets} folders={folders} addFolder={addFolder} searchRef={searchRef} {...sharedProps} />}
         {view.page === "folder"      && <FolderPage folder={currentFolder} sets={sets} folders={folders} deleteFolder={deleteFolder} updateFolder={updateFolder} moveSetToFolder={moveSetToFolder} addSet={addSet} updateSet={updateSet} deleteSet={deleteSet} {...sharedProps} />}
         {view.page === "folderStudy" && <FolderStudyPage folder={currentFolder} folderSets={sets.filter(x => x.folderId === view.folderId)} updateSet={updateSet} {...sharedProps} />}
         {view.page === "create"      && <CreatePage addSet={addSet} folders={folders} folderId={view.folderId || null} {...sharedProps} />}
@@ -943,6 +1074,21 @@ export default function App() {
         {view.page === "study"       && <StudyPage  set={currentSet} updateSet={updateSet} starredOnly={!!view.starredOnly} {...sharedProps} />}
         {view.page === "test"        && <TestPage   set={currentSet} {...sharedProps} />}
         {view.page === "edit"        && <EditPage   set={currentSet} updateSet={updateSet} focusCardId={view.focusCardId} returnView={view.returnView} {...sharedProps} />}
+        {view.page === "smartStudy"  && <SmartStudyPage sets={sets} updateSet={updateSet} {...sharedProps} />}
+        {view.page === "settings"    && <SettingsPage toggleTheme={toggleTheme} theme={theme} sets={sets} setSets={setSets} setFolders={setFolders} {...sharedProps} />}
+
+        {/* Undo delete toast */}
+        {deletedSet && (
+          <div role="alert" aria-live="polite" style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 100,
+            background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 12, padding: "12px 20px",
+            display: "flex", alignItems: "center", gap: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+            animation: "fadeIn 0.2s ease", fontFamily: "'DM Sans', sans-serif" }}>
+            <span style={{ color: t.text, fontSize: 14 }}>Set deleted</span>
+            <button onClick={undoDelete} style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              Undo
+            </button>
+          </div>
+        )}
       </div>
     </ThemeCtx.Provider>
   );
@@ -1009,39 +1155,59 @@ function ApiKeyButton() {
 // ─── NavBar ───
 function NavBar({ onBack, title, S, theme, toggleTheme, showShortcuts }) {
   return (
-    <div style={S.navBar}>
-      <button style={S.backBtn} onClick={onBack}><Icons.Back /></button>
+    <nav style={S.navBar} role="navigation" aria-label="Main navigation">
+      <button style={S.backBtn} onClick={onBack} aria-label="Go back"><Icons.Back /></button>
       <h2 style={S.navTitle}>{title}</h2>
       {showShortcuts && <ShortcutHelper />}
       <ApiKeyButton />
-      <button style={S.themeBtn} onClick={toggleTheme} title="Toggle theme">
+      <button style={S.themeBtn} onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`} title="Toggle theme">
         {theme === "dark" ? <Icons.Sun /> : <Icons.Moon />}
       </button>
-    </div>
+    </nav>
   );
 }
 
 // ─── Set Card (shared between HomePage and FolderPage) ───
 function SetCard({ set, S, nav, folderName }) {
+  const t = useContext(ThemeCtx);
   const dueCount = set.cards.filter(isDue).length;
+  const [showPreview, setShowPreview] = useState(false);
+  const hoverTimer = useRef(null);
+  const handleEnter = () => { hoverTimer.current = setTimeout(() => setShowPreview(true), 500); };
+  const handleLeave = () => { clearTimeout(hoverTimer.current); setShowPreview(false); };
+
   return (
-    <button style={S.setCard} onClick={() => nav("detail", { setId: set.id })} className="set-card">
-      <div style={S.setCardTop}>
-        <span style={S.cardCount}>{set.cards.length} cards</span>
-        {dueCount > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: "#F87171", background: "rgba(239,68,68,0.12)", padding: "2px 8px", borderRadius: 6, fontFamily: "'Space Mono', monospace" }}>{dueCount} due</span>}
-      </div>
-      <h3 style={S.setTitle}>{set.title}</h3>
-      {set.description && <p style={S.setDesc}>{set.description}</p>}
-      <div style={S.setCardBottom}>
-        <span style={S.dateLabel}>{new Date(set.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-        {folderName && <span style={{ fontSize: 11, color: "#FBBF24", display: "flex", alignItems: "center", gap: 3 }}><Icons.Folder />{folderName}</span>}
-      </div>
-    </button>
+    <div style={{ position: "relative" }} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+      <button style={S.setCard} onClick={() => nav("detail", { setId: set.id })} className="set-card">
+        <div style={S.setCardTop}>
+          <span style={S.cardCount}>{set.cards.length} cards</span>
+          {dueCount > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: "#F87171", background: "rgba(239,68,68,0.12)", padding: "2px 8px", borderRadius: 6, fontFamily: "'Space Mono', monospace" }}>{dueCount} due</span>}
+        </div>
+        <h3 style={S.setTitle}>{set.title}</h3>
+        {set.description && <p style={S.setDesc}>{set.description}</p>}
+        <div style={S.setCardBottom}>
+          <span style={S.dateLabel}>{new Date(set.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+          {folderName && <span style={{ fontSize: 11, color: "#FBBF24", display: "flex", alignItems: "center", gap: 3 }}><Icons.Folder />{folderName}</span>}
+        </div>
+      </button>
+      {showPreview && set.cards.length > 0 && (
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 20, background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 10, padding: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.2)", animation: "fadeIn 0.15s ease", marginTop: 4 }}>
+          {set.cards.slice(0, 3).map(card => (
+            <div key={card.id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, padding: "3px 0", borderBottom: `1px solid ${t.border}` }}>
+              <span style={{ color: t.text, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.term}</span>
+              <span style={{ color: t.text4, flexShrink: 0 }}>→</span>
+              <span style={{ color: t.text3, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.definition}</span>
+            </div>
+          ))}
+          {set.cards.length > 3 && <p style={{ color: t.text4, fontSize: 11, marginTop: 4 }}>+{set.cards.length - 3} more</p>}
+        </div>
+      )}
+    </div>
   );
 }
 
 // ─── Home Page ───
-function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
+function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav, searchRef }) {
   const [search, setSearch] = useState("");
   const byTitle = (a, b) => a.title.localeCompare(b.title, undefined, { numeric: true });
   const ungrouped = sets.filter(s => !s.folderId).sort(byTitle);
@@ -1071,16 +1237,22 @@ function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
             <h1 style={S.logo}>⚡ FlashForge</h1>
             <p style={S.subtitle}>Master anything, one card at a time</p>
           </div>
-          <button style={S.themeBtn} onClick={toggleTheme} title="Toggle theme">
-            {theme === "dark" ? <Icons.Sun /> : <Icons.Moon />}
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button style={S.themeBtn} onClick={() => nav("settings")} title="Settings">
+              <Icons.Settings />
+            </button>
+            <button style={S.themeBtn} onClick={toggleTheme} title="Toggle theme">
+              {theme === "dark" ? <Icons.Sun /> : <Icons.Moon />}
+            </button>
+          </div>
         </div>
         {sets.length > 0 && (
           <div style={{ position: "relative", marginTop: 16 }}>
             <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: t.text4, pointerEvents: "none" }}><Icons.Search /></span>
             <input
+              ref={searchRef}
               style={{ ...S.input, marginBottom: 0, paddingLeft: 36 }}
-              placeholder="Search sets and cards…"
+              placeholder="Search sets and cards… (press /)"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -1113,6 +1285,53 @@ function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav }) {
         )
       ) : (
         <>
+          {/* Smart Study Recommendation */}
+          {(() => {
+            const allDue = sets.flatMap(s => s.cards).filter(isDue);
+            const setsWithDue = sets.filter(s => s.cards.some(isDue));
+            if (allDue.length === 0) return null;
+            return (
+              <div style={{ padding: "4px 24px 12px", maxWidth: 1200, margin: "0 auto" }}>
+                <button onClick={() => nav("smartStudy")} style={{ ...S.studyAllBtn, width: "100%", justifyContent: "center", padding: "16px 24px", borderRadius: 14, gap: 12 }} className="primary-btn">
+                  <Icons.Zap />
+                  <span>{allDue.length} card{allDue.length !== 1 ? "s" : ""} due across {setsWithDue.length} set{setsWithDue.length !== 1 ? "s" : ""} — Study Now</span>
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* Recently Studied */}
+          {(() => {
+            const recent = recentStorage.load();
+            const recentSets = recent.map(r => ({ ...r, set: sets.find(s => s.id === r.setId) })).filter(r => r.set);
+            if (recentSets.length === 0) return null;
+            const timeAgo = (ts) => {
+              const mins = Math.round((Date.now() - ts) / 60000);
+              if (mins < 60) return `${mins}m ago`;
+              const hrs = Math.round(mins / 60);
+              if (hrs < 24) return `${hrs}h ago`;
+              return `${Math.round(hrs / 24)}d ago`;
+            };
+            return (
+              <>
+                <div style={S.sectionLabel}>Recently Studied</div>
+                <div style={S.recentRow}>
+                  {recentSets.slice(0, 5).map(({ set: s, timestamp }) => (
+                    <button key={s.id} style={S.recentCard} onClick={() => nav("detail", { setId: s.id })} className="set-card">
+                      <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: t.text3 }}>
+                        <Icons.Clock />
+                        <span>{timeAgo(timestamp)}</span>
+                        <span style={{ color: t.text4 }}>·</span>
+                        <span>{s.cards.length} cards</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
+
           {!hasContent && (
             <div style={S.emptyState}>
               <p style={{ fontSize: 48, marginBottom: 12 }}>📚</p>
@@ -1235,17 +1454,113 @@ function FolderPage({ folder, sets, nav, S, t, theme, toggleTheme, deleteFolder,
   );
 }
 
+// ─── Breadcrumbs ───
+function Breadcrumbs({ crumbs, S, t }) {
+  return (
+    <div style={S.breadcrumbs}>
+      {crumbs.map((crumb, i) => (
+        <span key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {i > 0 && <span style={S.breadcrumbSep}>/</span>}
+          {crumb.action ? (
+            <button style={S.breadcrumbLink} onClick={crumb.action} className="secondary-btn">{crumb.label}</button>
+          ) : (
+            <span style={S.breadcrumbCurrent}>{crumb.label}</span>
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ─── Confetti ───
+const CONFETTI_COLORS = ["#6366F1", "#818CF8", "#A78BFA", "#34D399", "#FBBF24", "#F87171"];
+function Confetti() {
+  const [show, setShow] = useState(true);
+  useEffect(() => { const t = setTimeout(() => setShow(false), 4000); return () => clearTimeout(t); }, []);
+  if (!show) return null;
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 50, overflow: "hidden" }}>
+      {Array.from({ length: 50 }, (_, i) => (
+        <div key={i} style={{
+          position: "absolute",
+          left: `${Math.random() * 100}%`,
+          top: -10,
+          width: Math.random() * 8 + 4,
+          height: Math.random() * 8 + 4,
+          borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+          background: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+          animation: `confettiFall ${2 + Math.random() * 2}s linear ${Math.random() * 1}s forwards`,
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ─── Recent Study Storage ───
+const RECENT_KEY = "flashforge-recent";
+const recentStorage = {
+  load() { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } },
+  save(data) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(data)); } catch {} },
+  add(setId) {
+    const recent = this.load().filter(r => r.setId !== setId);
+    recent.unshift({ setId, timestamp: Date.now() });
+    this.save(recent.slice(0, 10));
+  },
+};
+
 // ─── Study Core (shared between StudyPage and FolderStudyPage) ───
-function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, theme, toggleTheme }) {
+function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, theme, toggleTheme, setId }) {
   const [cardOrder, setCardOrder] = useState(() => studyCards.map((_, i) => i));
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [shuffled, setShuffled] = useState(false);
   const [showInterval, setShowInterval] = useState(null);
 
+  // Session tracking
+  const [sessionStartTime] = useState(() => Date.now());
+  const [sessionRatings, setSessionRatings] = useState([]);
+  const [sessionComplete, setSessionComplete] = useState(false);
+
+  // Card slide animation
+  const [slideAnim, setSlideAnim] = useState(null);
+
+  // Auto-play
+  const [autoPlay, setAutoPlay] = useState(false);
+  const [autoPlaySpeed, setAutoPlaySpeed] = useState(3000);
+  const autoPlayTimer = useRef(null);
+
+  useEffect(() => {
+    if (!autoPlay || sessionComplete || showRoundSummary) return;
+    autoPlayTimer.current = setTimeout(() => {
+      if (!flipped) {
+        setFlipped(true);
+      } else {
+        go(1);
+      }
+    }, autoPlaySpeed);
+    return () => clearTimeout(autoPlayTimer.current);
+  }, [autoPlay, flipped, index, autoPlaySpeed, sessionComplete, showRoundSummary]);
+
+  const toggleAutoPlay = () => setAutoPlay(a => !a);
+  const pauseAutoPlay = () => { if (autoPlay) { setAutoPlay(false); clearTimeout(autoPlayTimer.current); } };
+
+  // Round-based study
+  const ROUND_SIZE = 7;
+  const [currentRound, setCurrentRound] = useState(0);
+  const [showRoundSummary, setShowRoundSummary] = useState(false);
+  const [roundRatings, setRoundRatings] = useState([]);
+
+  useEffect(() => { if (setId) recentStorage.add(setId); }, [setId]);
+
   const total = cardOrder.length;
+  const totalRounds = total > ROUND_SIZE ? Math.ceil(total / ROUND_SIZE) : 1;
+  const useRounds = total > ROUND_SIZE;
+  const roundStart = currentRound * ROUND_SIZE;
+  const roundEnd = Math.min(roundStart + ROUND_SIZE, total);
+  const roundTotal = roundEnd - roundStart;
+  const effectiveIndex = index - roundStart;
   const currentCard = studyCards[cardOrder[index]];
-  const progress = total > 0 ? (index / total) * 100 : 0;
+  const progress = total > 0 ? ((sessionComplete ? total : index) / total) * 100 : 0;
 
   const handleShuffle = () => {
     const newOrder = shuffled ? studyCards.map((_, i) => i) : shuffle(studyCards.map((_, i) => i));
@@ -1259,34 +1574,48 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, 
   const go = useCallback((dir) => {
     setFlipped(false);
     setShowInterval(null);
-    setTimeout(() => setIndex(i => {
-      if (dir === 1) return i < total - 1 ? i + 1 : 0;
-      return i > 0 ? i - 1 : total - 1;
-    }), 100);
-  }, [total]);
+    setSlideAnim(null);
+    setTimeout(() => {
+      setIndex(i => {
+        if (dir === 1) return i < roundEnd - 1 ? i + 1 : roundStart;
+        return i > roundStart ? i - 1 : roundEnd - 1;
+      });
+      setSlideAnim("slideIn");
+      setTimeout(() => setSlideAnim(null), 250);
+    }, 100);
+  }, [roundStart, roundEnd]);
 
   const handleRate = (rating) => {
+    pauseAutoPlay();
     const sm2 = computeSM2(currentCard, rating);
     setShowInterval(sm2.interval);
     onRate(currentCard, sm2);
+    setSessionRatings(prev => [...prev, { cardId: currentCard.id, rating }]);
+    setRoundRatings(prev => [...prev, { cardId: currentCard.id, rating }]);
     setTimeout(() => {
       setShowInterval(null);
-      if (index < total - 1) {
+      if (index < roundEnd - 1) {
         setFlipped(false);
         setTimeout(() => setIndex(i => i + 1), 100);
+      } else if (useRounds && currentRound < totalRounds - 1) {
+        setShowRoundSummary(true);
+      } else {
+        setSessionComplete(true);
       }
     }, 900);
   };
 
   const handleKey = useCallback((e) => {
-    if (e.key === " " || e.key === "Enter") { e.preventDefault(); setFlipped(f => !f); }
-    if (e.key === "ArrowRight") go(1);
-    if (e.key === "ArrowLeft") go(-1);
+    if (sessionComplete) return;
+    if (e.key === "p" || e.key === "P") { e.preventDefault(); toggleAutoPlay(); return; }
+    if (e.key === " " || e.key === "Enter") { e.preventDefault(); pauseAutoPlay(); setFlipped(f => !f); }
+    if (e.key === "ArrowRight") { pauseAutoPlay(); go(1); }
+    if (e.key === "ArrowLeft") { pauseAutoPlay(); go(-1); }
     if (flipped && showInterval === null) {
       const ratingKeys = { "1": 0, "2": 1, "3": 2, "4": 3 };
       if (ratingKeys[e.key] !== undefined) { e.preventDefault(); handleRate(ratingKeys[e.key]); }
     }
-  }, [go, flipped, showInterval, handleRate]);
+  }, [go, flipped, showInterval, handleRate, sessionComplete, autoPlay]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKey);
@@ -1299,10 +1628,157 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, 
     if (touchStart.current === null) return;
     const dx = e.changedTouches[0].clientX - touchStart.current;
     touchStart.current = null;
-    if (Math.abs(dx) < 40) return; // short tap — let onClick handle flip
+    if (Math.abs(dx) < 40) return;
     e.preventDefault();
     if (dx < 0) go(1); else go(-1);
   };
+
+  const restartSession = (filteredCards) => {
+    if (filteredCards) {
+      const filteredIds = new Set(filteredCards.map(c => c.id));
+      setCardOrder(studyCards.map((_, i) => i).filter(i => filteredIds.has(studyCards[i].id)));
+    } else {
+      setCardOrder(studyCards.map((_, i) => i));
+    }
+    setIndex(0);
+    setFlipped(false);
+    setShowInterval(null);
+    setSessionRatings([]);
+    setSessionComplete(false);
+    setShuffled(false);
+    setCurrentRound(0);
+    setShowRoundSummary(false);
+    setRoundRatings([]);
+  };
+
+  const nextRound = () => {
+    setCurrentRound(r => r + 1);
+    setIndex(roundEnd);
+    setFlipped(false);
+    setShowInterval(null);
+    setShowRoundSummary(false);
+    setRoundRatings([]);
+  };
+
+  // Session summary
+  if (sessionComplete && sessionRatings.length > 0) {
+    const minutes = Math.max(1, Math.round((Date.now() - sessionStartTime) / 60000));
+    const counts = [0, 0, 0, 0];
+    sessionRatings.forEach(r => counts[r.rating]++);
+    const goodPercent = sessionRatings.length > 0 ? (sessionRatings.filter(r => r.rating >= 2).length / sessionRatings.length) : 0;
+    const showConfetti = goodPercent >= 0.8;
+    const missedCards = sessionRatings.filter(r => r.rating === 0).map(r => studyCards.find(c => c.id === r.cardId)).filter(Boolean);
+    const ratingLabels = ["Again", "Hard", "Good", "Easy"];
+    const ratingColors = ["#F87171", "#FCD34D", "#34D399", "#818CF8"];
+
+    return (
+      <div style={S.page}>
+        <NavBar onBack={onBack} title={title} S={S} theme={theme} toggleTheme={toggleTheme} />
+        {showConfetti && <Confetti />}
+        <div style={{ ...S.studyContainer, ...S.sessionSummary }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>{showConfetti ? "🎉" : "📊"}</div>
+          <h2 style={{ color: t.text, fontSize: 22, fontWeight: 700, marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>
+            {showConfetti ? "Great session!" : "Session Complete"}
+          </h2>
+          <p style={{ color: t.text3, fontSize: 14, marginBottom: 24 }}>
+            You studied {sessionRatings.length} card{sessionRatings.length !== 1 ? "s" : ""} in {minutes} min
+          </p>
+
+          <div style={S.summaryStats}>
+            {ratingLabels.map((label, i) => (
+              <div key={label} style={S.summaryStatItem}>
+                <span style={{ ...S.summaryStatNum, color: ratingColors[i] }}>{counts[i]}</span>
+                <span style={S.summaryStatLabel}>{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Mastery breakdown bar */}
+          <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", marginBottom: 20, background: t.bg3 }}>
+            {ratingLabels.map((label, i) => counts[i] > 0 ? (
+              <div key={label} style={{ height: "100%", width: `${(counts[i] / sessionRatings.length) * 100}%`, background: ratingColors[i], transition: "width 0.4s ease" }} />
+            ) : null)}
+          </div>
+
+          {missedCards.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <h3 style={{ color: t.text, fontSize: 14, fontWeight: 600, marginBottom: 8, fontFamily: "'Space Mono', monospace", textAlign: "left" }}>
+                Needs work ({missedCards.length})
+              </h3>
+              {missedCards.slice(0, 5).map(card => (
+                <div key={card.id} style={S.missedCard}>
+                  <span style={{ color: t.text, fontSize: 14, fontWeight: 500 }}>{card.term}</span>
+                  <span style={{ color: t.text4, margin: "0 8px" }}>→</span>
+                  <span style={{ color: t.text3, fontSize: 13 }}>{card.definition.length > 60 ? card.definition.slice(0, 60) + "…" : card.definition}</span>
+                </div>
+              ))}
+              {missedCards.length > 5 && <p style={{ color: t.text4, fontSize: 12, marginTop: 4 }}>+{missedCards.length - 5} more</p>}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+            <button style={S.primaryBtn} className="primary-btn" onClick={() => restartSession()}>Study Again</button>
+            {missedCards.length > 0 && (
+              <button style={{ ...S.primaryBtn, background: "linear-gradient(135deg, #EF4444, #DC2626)" }} className="primary-btn" onClick={() => restartSession(missedCards)}>
+                Study Missed ({missedCards.length})
+              </button>
+            )}
+            <button style={S.secondaryBtn} className="secondary-btn" onClick={onBack}>Back to Set</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Round summary
+  if (showRoundSummary) {
+    const roundCounts = [0, 0, 0, 0];
+    roundRatings.forEach(r => roundCounts[r.rating]++);
+    const roundMissed = roundRatings.filter(r => r.rating === 0).map(r => studyCards.find(c => c.id === r.cardId)).filter(Boolean);
+    const ratingLabels = ["Again", "Hard", "Good", "Easy"];
+    const ratingColors = ["#F87171", "#FCD34D", "#34D399", "#818CF8"];
+
+    return (
+      <div style={S.page}>
+        <NavBar onBack={onBack} title={title} S={S} theme={theme} toggleTheme={toggleTheme} />
+        <div style={{ ...S.studyContainer, ...S.sessionSummary }}>
+          <div style={S.progressWrap}><div style={{ ...S.progressBar, width: `${progress}%` }} /></div>
+          <h2 style={{ color: t.text, fontSize: 20, fontWeight: 700, marginBottom: 4, marginTop: 16 }}>
+            Round {currentRound + 1} of {totalRounds} complete
+          </h2>
+          <p style={{ color: t.text3, fontSize: 13, marginBottom: 20 }}>{roundTotal} cards reviewed</p>
+
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
+            {ratingLabels.map((label, i) => roundCounts[i] > 0 ? (
+              <span key={label} style={{ ...S.masteryBadge, background: `${ratingColors[i]}20`, color: ratingColors[i], padding: "4px 12px", fontSize: 13 }}>
+                {roundCounts[i]} {label}
+              </span>
+            ) : null)}
+          </div>
+
+          {roundMissed.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <h3 style={{ color: t.text, fontSize: 13, fontWeight: 600, marginBottom: 8, textAlign: "left", fontFamily: "'Space Mono', monospace" }}>Needs work</h3>
+              {roundMissed.slice(0, 4).map(card => (
+                <div key={card.id} style={S.missedCard}>
+                  <span style={{ color: t.text, fontSize: 13, fontWeight: 500 }}>{card.term}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <button style={S.primaryBtn} className="primary-btn" onClick={nextRound}>
+              Continue to Round {currentRound + 2}
+            </button>
+            <button style={S.secondaryBtn} className="secondary-btn" onClick={() => setSessionComplete(true)}>
+              End Session
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={S.page}>
@@ -1311,15 +1787,32 @@ function StudyCore({ studyCards, title, dueCount, onBack, onRate, onEdit, S, t, 
         <div style={S.progressWrap}><div style={{ ...S.progressBar, width: `${progress}%` }} /></div>
         <div style={S.studyMeta}>
           <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: t.text3 }}>
-            {index + 1} / {total}
+            {effectiveIndex + 1} / {roundTotal}
+            {useRounds && <span style={{ color: "#818CF8", marginLeft: 8 }}>Round {currentRound + 1}/{totalRounds}</span>}
             {dueCount > 0 && <span style={{ color: "#F87171", marginLeft: 8 }}>{dueCount} due</span>}
           </span>
-          <button style={{ ...S.iconBtn, ...(shuffled ? { color: "#6366F1" } : {}) }} onClick={handleShuffle} title="Shuffle">
-            <Icons.Shuffle />
-          </button>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button style={{ ...S.iconBtn, ...(autoPlay ? { color: "#34D399" } : {}) }} onClick={toggleAutoPlay} title={autoPlay ? "Pause auto-play (P)" : "Auto-play (P)"}>
+              {autoPlay ? <Icons.Pause /> : <Icons.Play />}
+            </button>
+            {autoPlay && (
+              <div style={{ display: "flex", gap: 2 }}>
+                {[{ label: "1.5s", val: 1500 }, { label: "3s", val: 3000 }, { label: "5s", val: 5000 }].map(s => (
+                  <button key={s.val} onClick={() => setAutoPlaySpeed(s.val)}
+                    style={{ padding: "2px 6px", fontSize: 10, borderRadius: 4, border: "none", cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                      background: autoPlaySpeed === s.val ? "#6366F1" : t.bg3, color: autoPlaySpeed === s.val ? "#fff" : t.text3 }}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button style={{ ...S.iconBtn, ...(shuffled ? { color: "#6366F1" } : {}) }} onClick={handleShuffle} title="Shuffle">
+              <Icons.Shuffle />
+            </button>
+          </div>
         </div>
 
-        <div style={{ ...S.flashcardOuter, position: "relative", touchAction: "pan-y" }} onClick={() => setFlipped(f => !f)} className="flashcard-outer" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        <div role="button" tabIndex={0} aria-label={`Card ${effectiveIndex + 1} of ${roundTotal}, ${flipped ? "definition" : "term"} side: ${flipped ? (currentCard?.definition || "") : (currentCard?.term || "")}. Press space to flip.`} style={{ ...S.flashcardOuter, position: "relative", touchAction: "pan-y", ...(slideAnim ? { animation: `${slideAnim} 0.25s ease` } : {}) }} onClick={() => setFlipped(f => !f)} className="flashcard-outer" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
           {onEdit && (
             <button
               onClick={e => { e.stopPropagation(); onEdit(currentCard.id); }}
@@ -1403,6 +1896,7 @@ function StudyPage({ set, nav, updateSet, starredOnly, S, t, theme, toggleTheme 
       onBack={() => nav("detail", { setId: set.id })}
       onRate={onRate}
       onEdit={cardId => nav("edit", { setId: set.id, focusCardId: cardId, returnView: { page: "study", setId: set.id, starredOnly: starredOnly || false } })}
+      setId={set.id}
       S={S} t={t} theme={theme} toggleTheme={toggleTheme}
     />
   );
@@ -1659,6 +2153,10 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
   const dueCount = set.cards.filter(isDue).length;
   const starredCount = set.cards.filter(c => c.starred).length;
 
+  // Card filtering & sorting
+  const [cardFilter, setCardFilter] = useState("all");
+  const [cardSort, setCardSort] = useState("default");
+
   const handleExport = () => {
     const blob = new Blob([JSON.stringify(set, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -1677,11 +2175,11 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
     <div style={S.page}>
       <NavBar onBack={backTarget} title={set.title} S={S} theme={theme} toggleTheme={toggleTheme} />
       <div style={S.detailHeader}>
-        {parentFolder && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: t.text3, fontSize: 13 }}>
-            <Icons.Folder /><span>{parentFolder.name}</span>
-          </div>
-        )}
+        <Breadcrumbs crumbs={[
+          { label: "Home", action: () => nav("home") },
+          ...(parentFolder ? [{ label: parentFolder.name, action: () => nav("folder", { folderId: parentFolder.id }) }] : []),
+          { label: set.title },
+        ]} S={S} t={t} />
         {set.description && <p style={{ color: t.text2, fontSize: 14, marginBottom: 10 }}>{set.description}</p>}
         {(() => {
           const now = Date.now();
@@ -1696,25 +2194,29 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
             </div>
           );
         })()}
-        <div style={{ ...S.modeGrid, gridTemplateColumns: starredCount > 0 ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr" }} className="mode-grid">
-          <button style={S.modeBtn} className="mode-btn" onClick={() => nav("study", { setId: set.id })} disabled={set.cards.length === 0}>
-            <Icons.Cards /><span>Flashcards</span>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }} className="mode-grid">
+          <button style={{ ...S.modeCard, background: "linear-gradient(135deg, #312E81, #4338CA)" }} className="mode-card" onClick={() => nav("study", { setId: set.id })} disabled={set.cards.length === 0}>
+            <Icons.Cards />
+            <span style={S.modeCardTitle}>Flashcards</span>
+            <span style={S.modeCardDesc}>Flip through cards with spaced repetition</span>
             {dueCount > 0 && <span style={S.dueBadge}>{dueCount}</span>}
           </button>
           {starredCount > 0 && (
-            <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #92400E, #B45309)" }} className="mode-btn" onClick={() => nav("study", { setId: set.id, starredOnly: true })}>
-              <Icons.Star filled /><span>Starred</span>
-              <span style={S.dueBadge}>{starredCount}</span>
+            <button style={{ ...S.modeCard, background: "linear-gradient(135deg, #92400E, #B45309)" }} className="mode-card" onClick={() => nav("study", { setId: set.id, starredOnly: true })}>
+              <Icons.Star filled />
+              <span style={S.modeCardTitle}>Starred</span>
+              <span style={S.modeCardDesc}>Focus on your {starredCount} favorite cards</span>
             </button>
           )}
-          <div style={{ position: "relative" }} title={set.cards.length < 4 ? "Need ≥ 4 cards to test" : ""}>
-            <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #065F46, #047857)", width: "100%", opacity: set.cards.length < 4 ? 0.5 : 1 }} className="mode-btn" onClick={() => nav("test", { setId: set.id })} disabled={set.cards.length < 4}>
-              <Icons.Test /><span>Test</span>
-              {set.cards.length < 4 && <span style={{ fontSize: 9, opacity: 0.8, fontFamily: "'Space Mono', monospace", marginTop: -4 }}>need ≥ 4 cards</span>}
-            </button>
-          </div>
-          <button style={{ ...S.modeBtn, background: "linear-gradient(135deg, #7C3AED, #6D28D9)" }} className="mode-btn" onClick={() => nav("edit", { setId: set.id })}>
-            <Icons.Edit /><span>Edit</span>
+          <button style={{ ...S.modeCard, background: "linear-gradient(135deg, #065F46, #047857)", opacity: set.cards.length < 4 ? 0.5 : 1 }} className="mode-card" onClick={() => nav("test", { setId: set.id })} disabled={set.cards.length < 4} title={set.cards.length < 4 ? "Need ≥ 4 cards to test" : ""}>
+            <Icons.Test />
+            <span style={S.modeCardTitle}>Test</span>
+            <span style={S.modeCardDesc}>{set.cards.length < 4 ? "Need ≥ 4 cards" : "Multiple choice & written exam"}</span>
+          </button>
+          <button style={{ ...S.modeCard, background: "linear-gradient(135deg, #7C3AED, #6D28D9)" }} className="mode-card" onClick={() => nav("edit", { setId: set.id })}>
+            <Icons.Edit />
+            <span style={S.modeCardTitle}>Edit</span>
+            <span style={S.modeCardDesc}>Modify cards and content</span>
           </button>
         </div>
 
@@ -1733,24 +2235,85 @@ function DetailPage({ set, folders, nav, updateSet, deleteSet, moveSetToFolder, 
         <h3 style={{ color: t.text, fontSize: 14, fontWeight: 600, marginBottom: 12, fontFamily: "'Space Mono', monospace" }}>
           Cards in this set ({set.cards.length})
         </h3>
-        {set.cards.map(card => (
-          <div key={card.id} style={S.cardPreviewRow}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ marginBottom: 4 }}>
-                {renderContent(card.term, card.termImage, card.termTable, { fontSize: 14, fontWeight: 500, color: t.text })}
+        {(() => {
+          const counts = {};
+          set.cards.forEach(c => { const lvl = getMasteryLevel(c); counts[lvl] = (counts[lvl] || 0) + 1; });
+          const total = set.cards.length;
+          const levels = ["mastered", "familiar", "learning", "not-studied"];
+          return (
+            <>
+              <div style={S.masteryBar}>
+                {levels.map(lvl => counts[lvl] ? (
+                  <div key={lvl} style={{ ...S.masterySegment, width: `${(counts[lvl] / total) * 100}%`, background: MASTERY_COLORS[lvl].color }} title={`${MASTERY_COLORS[lvl].label}: ${counts[lvl]}`} />
+                ) : null)}
               </div>
-              <div>
-                {renderContent(card.definition, card.defImage, card.defTable, { fontSize: 13, color: t.text3 })}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                {levels.map(lvl => counts[lvl] ? (
+                  <span key={lvl} style={{ ...S.masteryBadge, background: MASTERY_COLORS[lvl].bg, color: MASTERY_COLORS[lvl].color }}>
+                    {counts[lvl]} {MASTERY_COLORS[lvl].label.toLowerCase()}
+                  </span>
+                ) : null)}
               </div>
-              {card.nextReview > 0 && (
-                <p style={{ color: t.text4, fontSize: 11, marginTop: 4, fontFamily: "'Space Mono', monospace" }}>
-                  {isDue(card) ? "Due now" : `Next: ${Math.ceil((card.nextReview - Date.now()) / 86400000)}d`}
-                </p>
+            </>
+          );
+        })()}
+
+        {/* Filter & Sort bar */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+          {[["all", "All"], ["starred", "Starred"], ["learning", "Learning"], ["mastered", "Mastered"], ["due", "Due"]].map(([val, label]) => (
+            <button key={val} onClick={() => setCardFilter(val)} style={{ ...S.chipBtn, ...(cardFilter === val ? S.chipActive : {}), padding: "4px 12px", fontSize: 12 }}>{label}</button>
+          ))}
+          <select style={{ ...S.folderSelect, flex: "none", padding: "4px 8px", fontSize: 12 }} value={cardSort} onChange={e => setCardSort(e.target.value)}>
+            <option value="default">Default order</option>
+            <option value="alpha">Alphabetical</option>
+            <option value="mastery">Mastery (low → high)</option>
+            <option value="review">Next review</option>
+          </select>
+        </div>
+
+        {(() => {
+          const masteryOrder = { "not-studied": 0, "learning": 1, "familiar": 2, "mastered": 3 };
+          let filtered = set.cards;
+          if (cardFilter === "starred") filtered = filtered.filter(c => c.starred);
+          else if (cardFilter === "learning") filtered = filtered.filter(c => getMasteryLevel(c) === "learning" || getMasteryLevel(c) === "not-studied");
+          else if (cardFilter === "mastered") filtered = filtered.filter(c => getMasteryLevel(c) === "mastered" || getMasteryLevel(c) === "familiar");
+          else if (cardFilter === "due") filtered = filtered.filter(isDue);
+
+          if (cardSort === "alpha") filtered = [...filtered].sort((a, b) => a.term.localeCompare(b.term));
+          else if (cardSort === "mastery") filtered = [...filtered].sort((a, b) => masteryOrder[getMasteryLevel(a)] - masteryOrder[getMasteryLevel(b)]);
+          else if (cardSort === "review") filtered = [...filtered].sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0));
+
+          return (
+            <>
+              {filtered.length !== set.cards.length && (
+                <p style={{ color: t.text3, fontSize: 12, marginBottom: 8 }}>Showing {filtered.length} of {set.cards.length} cards</p>
               )}
-            </div>
-            <button style={S.iconBtn} onClick={() => toggleStar(card.id)}><Icons.Star filled={card.starred} /></button>
-          </div>
-        ))}
+              {filtered.map(card => {
+                const mastery = getMasteryLevel(card);
+                const mc = MASTERY_COLORS[mastery];
+                return (
+                <div key={card.id} style={S.cardPreviewRow}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>{renderContent(card.term, card.termImage, card.termTable, { fontSize: 14, fontWeight: 500, color: t.text })}</div>
+                      <span style={{ ...S.masteryBadge, background: mc.bg, color: mc.color, fontSize: 10, padding: "1px 6px", flexShrink: 0 }}>{mc.label}</span>
+                    </div>
+                    <div>
+                      {renderContent(card.definition, card.defImage, card.defTable, { fontSize: 13, color: t.text3 })}
+                    </div>
+                    {card.nextReview > 0 && (
+                      <p style={{ color: t.text4, fontSize: 11, marginTop: 4, fontFamily: "'Space Mono', monospace" }}>
+                        {isDue(card) ? "Due now" : `Next: ${Math.ceil((card.nextReview - Date.now()) / 86400000)}d`}
+                      </p>
+                    )}
+                  </div>
+                  <button style={S.iconBtn} onClick={() => toggleStar(card.id)}><Icons.Star filled={card.starred} /></button>
+                </div>
+                );
+              })}
+            </>
+          );
+        })()}
       </div>
 
       <div style={{ padding: "0 24px 32px", maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1833,6 +2396,158 @@ function EditPage({ set, nav, updateSet, focusCardId, returnView, S, theme, togg
       <button style={S.addCardBtn} onClick={addCardRow}><Icons.Plus /> Add Card</button>
       <div style={{ padding: "16px 24px 32px", maxWidth: 900, margin: "0 auto" }}>
         <button style={{ ...S.primaryBtn, width: "100%" }} onClick={handleSave}>Save Changes</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Smart Study Page (all due cards across sets) ───
+function SmartStudyPage({ sets, nav, updateSet, S, t, theme, toggleTheme }) {
+  const [studyCards] = useState(() => {
+    const allCards = sets.flatMap(s => s.cards).filter(isDue);
+    return allCards.sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0));
+  });
+
+  const [cardSetMap] = useState(() => {
+    const map = {};
+    sets.forEach(s => s.cards.forEach(c => { map[c.id] = s.id; }));
+    return map;
+  });
+
+  const dueCount = studyCards.length;
+
+  const onRate = (card, sm2) => {
+    const ownerSetId = cardSetMap[card.id];
+    if (ownerSetId) {
+      updateSet(ownerSetId, st => ({ ...st, cards: st.cards.map(c => c.id === card.id ? { ...c, ...sm2 } : c) }));
+    }
+  };
+
+  if (studyCards.length === 0) {
+    return (
+      <div style={S.page}>
+        <NavBar onBack={() => nav("home")} title="Smart Study" S={S} theme={theme} toggleTheme={toggleTheme} />
+        <div style={{ ...S.studyContainer, textAlign: "center", padding: "60px 24px" }}>
+          <p style={{ fontSize: 48, marginBottom: 12 }}>🎉</p>
+          <h2 style={{ color: t.text, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>All caught up!</h2>
+          <p style={{ color: t.text3, fontSize: 14, marginBottom: 24 }}>No cards are due for review right now.</p>
+          <button style={S.primaryBtn} className="primary-btn" onClick={() => nav("home")}>Back to Home</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <StudyCore
+      studyCards={studyCards}
+      title="Smart Study — Due Cards"
+      dueCount={dueCount}
+      onBack={() => nav("home")}
+      onRate={onRate}
+      onEdit={cardId => { const sid = cardSetMap[cardId]; if (sid) nav("edit", { setId: sid, focusCardId: cardId, returnView: { page: "smartStudy" } }); }}
+      S={S} t={t} theme={theme} toggleTheme={toggleTheme}
+    />
+  );
+}
+
+// ─── Settings Page ───
+function SettingsPage({ nav, S, t, theme, toggleTheme, sets, setSets, setFolders }) {
+  const handleExportAll = () => {
+    const data = { sets: sets, folders: JSON.parse(localStorage.getItem("flashforge-folders") || "[]") };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "flashforge-backup.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportBackup = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.sets) { setSets(data.sets); storage.save(data.sets); }
+          if (data.folders) { setFolders(data.folders); foldersStorage.save(data.folders); }
+          alert("Backup restored successfully!");
+        } catch { alert("Invalid backup file."); }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  const handleClearAll = () => {
+    if (confirm("Delete ALL flashcard sets and folders? This cannot be undone.")) {
+      setSets([]);
+      setFolders([]);
+      storage.save([]);
+      foldersStorage.save([]);
+      localStorage.removeItem("flashforge-recent");
+      nav("home");
+    }
+  };
+
+  const sectionStyle = { background: t.bg2, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, marginBottom: 14 };
+  const sectionTitle = { color: t.text, fontSize: 15, fontWeight: 600, marginBottom: 12, fontFamily: "'DM Sans', sans-serif" };
+  const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${t.border}` };
+  const labelStyle = { color: t.text2, fontSize: 14 };
+
+  return (
+    <div style={S.page}>
+      <NavBar onBack={() => nav("home")} title="Settings" S={S} theme={theme} toggleTheme={toggleTheme} />
+      <div style={{ padding: "16px 24px 32px", maxWidth: 600, margin: "0 auto" }}>
+        <div style={sectionStyle}>
+          <h3 style={sectionTitle}>Appearance</h3>
+          <div style={rowStyle}>
+            <span style={labelStyle}>Theme</span>
+            <button style={S.secondaryBtn} className="secondary-btn" onClick={toggleTheme}>{theme === "dark" ? "Dark" : "Light"} — click to toggle</button>
+          </div>
+        </div>
+
+        <div style={sectionStyle}>
+          <h3 style={sectionTitle}>Data</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <button style={S.secondaryBtn} className="secondary-btn" onClick={handleExportAll}><Icons.Download /> Export all sets as backup</button>
+            <button style={S.secondaryBtn} className="secondary-btn" onClick={handleImportBackup}><Icons.Import /> Import backup from file</button>
+          </div>
+        </div>
+
+        <div style={sectionStyle}>
+          <h3 style={sectionTitle}>Keyboard Shortcuts</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+            {[
+              { keys: "/", desc: "Focus search" },
+              { keys: "N", desc: "New set" },
+              { keys: "Esc", desc: "Go back / Home" },
+              { keys: "P", desc: "Toggle auto-play" },
+              { keys: "Space", desc: "Flip card" },
+              { keys: "← →", desc: "Navigate cards" },
+              { keys: "1-4", desc: "Rate card" },
+            ].map(({ keys, desc }) => (
+              <div key={keys} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <kbd style={{ background: t.bg3, border: `1px solid ${t.border2}`, borderRadius: 4, padding: "1px 6px", fontSize: 11, fontFamily: "'Space Mono', monospace", color: t.text2, whiteSpace: "nowrap" }}>{keys}</kbd>
+                <span style={{ color: t.text2, fontSize: 12 }}>{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ ...sectionStyle, borderColor: "rgba(239,68,68,0.3)" }}>
+          <h3 style={{ ...sectionTitle, color: "#EF4444" }}>Danger Zone</h3>
+          <button style={S.dangerBtn} onClick={handleClearAll}>
+            <Icons.Trash /> Clear All Data
+          </button>
+        </div>
       </div>
     </div>
   );
