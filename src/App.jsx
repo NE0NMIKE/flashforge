@@ -631,8 +631,10 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
 
   const handlePaste = (e) => {
     const items = Array.from(e.clipboardData?.items || []);
+    const hasText = items.some(item => item.kind === "string" && (item.type === "text/plain" || item.type === "text/html"));
     const imgItem = items.find(item => item.kind === "file" && item.type.startsWith("image/"));
-    if (imgItem) {
+    // If clipboard has both text and image (e.g. OneNote), let the text paste normally
+    if (imgItem && !hasText) {
       e.preventDefault();
       setShowImage(true);
       handleImageData(imgItem.getAsFile());
