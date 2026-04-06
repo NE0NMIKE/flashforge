@@ -1370,6 +1370,15 @@ function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav, sea
     if (name?.trim()) addFolder({ id: uid(), name: name.trim(), createdAt: Date.now() });
   };
 
+  const handleExportAnki = () => {
+    const blob = new Blob([JSON.stringify(sets, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "flashforge-export.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   return (
     <div style={S.page}>
       <header style={S.header}>
@@ -1405,6 +1414,7 @@ function HomePage({ sets, folders, addFolder, S, t, theme, toggleTheme, nav, sea
         <button style={S.primaryBtn} className="primary-btn" onClick={() => nav("create")}><Icons.Plus /> New Set</button>
         <button style={S.secondaryBtn} onClick={handleNewFolder}><Icons.FolderPlus /> New Folder</button>
         <button style={S.secondaryBtn} onClick={() => nav("import")}><Icons.Import /> Import</button>
+        <button style={S.secondaryBtn} onClick={handleExportAnki}><Icons.Download /> Export for Anki</button>
       </div>
 
       {query ? (
