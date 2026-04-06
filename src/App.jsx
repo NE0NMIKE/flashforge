@@ -360,6 +360,28 @@ function TableEditor({ rows, onChange }) {
   );
 }
 
+async function compressImage(file, maxPx = 1200, quality = 0.82) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width: w, height: h } = img;
+        if (w > maxPx || h > maxPx) {
+          if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
+          else { w = Math.round(w * maxPx / h); h = maxPx; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function ExpandableImage({ src, style }) {
   const [hovered, setHovered] = useState(false);
   const [origin, setOrigin] = useState("center center");
@@ -431,15 +453,11 @@ function LatexScanModal({ onClose, onInsert }) {
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef();
 
-  const processFile = (file) => {
+  const processFile = async (file) => {
     if (!file || !file.type.startsWith("image/")) { setError("Please upload an image file."); return; }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
-      setImage({ dataUrl, base64: dataUrl.split(",")[1], mimeType: file.type });
-      setResult(""); setError("");
-    };
-    reader.readAsDataURL(file);
+    const dataUrl = await compressImage(file);
+    setImage({ dataUrl, base64: dataUrl.split(",")[1], mimeType: "image/jpeg" });
+    setResult(""); setError("");
   };
 
   const handlePaste = useCallback((e) => {
@@ -599,11 +617,10 @@ function RichFieldEditor({ label, textValue, onTextChange, image, onImageChange,
     el.style.height = `${el.scrollHeight}px`;
   }, [textValue]);
 
-  const handleImageData = (file) => {
+  const handleImageData = async (file) => {
     if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => { onImageChange(ev.target.result); };
-    reader.readAsDataURL(file);
+    const compressed = await compressImage(file);
+    onImageChange(compressed);
   };
 
   const handleFile = (e) => handleImageData(e.target.files?.[0]);
